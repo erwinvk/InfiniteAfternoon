@@ -1,0 +1,457 @@
+﻿@page
+@model Portfolio.Pages.AnyAfternoonModel
+@{
+    Layout = null;
+}
+
+<html>
+<head>
+    <title>Infinite Afternoon</title>
+    <link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap.min.css" />
+    <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/css/erwin.css" asp-append-version="true" />
+    <style>
+        body {
+            background: #5168A7;
+        }
+
+        input {
+            z-index: 100;
+        }
+
+        #titlecontainer {
+            position: fixed;
+            height: 100%;
+            width: 100%;
+            overflow: hidden;
+            z-index: -1;
+        }
+
+        h1 {
+            user-select: none;
+            display: flex;
+            justify-content: center;
+            font-family: 'Staatliches';
+            font-size: 50em;
+            text-align: center;
+            max-width: 100%;
+            margin-top: -1%;
+            line-height: .7em;
+            opacity: .2;
+            animation: slowpulse 50s ease-in-out infinite;
+
+            background: linear-gradient(#222 8%, #333 50%, #5168A7 80%);
+            background-size: 200% 200%;
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+                    
+        }
+
+        @@keyframes slowpulse {
+            0%,
+            100% {
+            transform: scale(1);
+            opacity: .2;
+            background-position-y:70%;
+            }
+            50% {
+            transform: scale(1.04);
+            opacity: .4;
+            background-position-y:-100px;
+            }
+        }
+
+        .noise {
+            pointer-events: none;
+            position: fixed;
+            top: -50%;
+            left: -50% ;
+            width: 200%;
+            height: 200%;
+            background-image: url( data:image/png;base64,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 );
+            background-repeat: repeat;
+            animation: noiseFX 2s steps(6) infinite;
+            opacity: .6;
+        }
+
+        @@keyframes noiseFX {
+            0%,
+            100% {
+            transform: translate(0, 0);
+            }
+            10% {
+            transform: translate(-5%, -10%);
+            }
+            30% {
+            transform: translate(3%, -15%);
+            }
+            50% {
+            transform: translate(12%, 9%);
+            }
+            70% {
+            transform: translate(9%, 4%);
+            }
+            90% {
+            transform: translate(-1%, 7%);
+            }
+        }
+
+        .themiddle {
+            width: 200px;
+            height: 200px;
+            background-color: #AECFDF;
+            box-shadow: 0 0 2px #AECFDF;
+            position: absolute;
+            top: 0;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            margin: auto;
+            border-radius: 999px;
+            padding: 20px;
+            transition: all 10s ease-in-out, transform 1s ease-in-out;
+            opacity: .8;
+            animation: mainCircleFx 50s ease-in-out infinite;
+        }
+
+        .themiddle:has(#start:hover) {
+            transform: scale(1.05);
+        }
+
+            .themiddle.second {
+                background-color: #BEDFEF;
+                z-index: -1;
+                animation: circleFx 50s ease-in-out infinite;
+                opacity: .3;
+            }
+
+            .themiddle.third {
+                background-color: #BDDEEE;
+                z-index: -1;
+                animation: circleFx 70s ease-in-out infinite reverse;
+                opacity: .2;
+            }
+
+            .themiddle.fourth {
+                background-color: #BEDFEF;
+                z-index: -1;
+                animation: circleFx 35s ease-in-out infinite;
+                animation-delay: 55s;
+                opacity: .3;
+            }
+
+            .themiddle.fifth {
+                background-color: #BDDEEE;
+                z-index: -1;
+                animation: circleFx 25s ease-in-out infinite alternate-reverse;
+                animation-delay: 150s;
+                opacity: .2;
+            }
+
+        #volumecontrol {
+            position: absolute;
+            bottom: -40px;
+            left: 0;
+            width: 100%;
+        }
+
+        input[type=range] {
+            -webkit-appearance: none;
+            margin: 10px 0;
+            width: 100%;
+        }
+
+            input[type=range]::-webkit-slider-runnable-track {
+                width: 100%;
+                height: 2px;
+                cursor: pointer;
+                background: #fff;
+                border-radius: 25px;
+                border: 0px solid #000101;
+            }
+
+            input[type=range]::-webkit-slider-thumb {
+                border: 0px solid #000000;
+                height: 20px;
+                width: 5px;
+                background: #fff;
+                cursor: pointer;
+                -webkit-appearance: none;
+                margin-top: -8px;
+            }
+
+            input[type=range]::-moz-range-track {
+                width: 100%;
+                height: 12.8px;
+                cursor: pointer;
+                animate: 0.2s;
+                background: #fff;
+                border-radius: 25px;
+            }
+
+            input[type=range]::-moz-range-thumb {
+                height: 20px;
+                width: 39px;
+                border-radius: 7px;
+                background: #fff;
+                cursor: pointer;
+            }
+
+        @@keyframes mainCircleFx {
+            0%, 100% {
+                border-radius:86% 74% 61% 79% / 74% 67% 83% 76%;
+            }
+
+            30% {
+                border-radius:78% 72% 80% 70% / 87% 77% 83% 73%
+            }
+
+            70% {
+                border-radius:63% 77% 86% 64% / 85% 78% 72% 75%
+            }
+        }
+
+        @@keyframes circleFx {
+            0%, 100% {
+                transform: translate(-5%, 3%) scale(1.16);
+                border-radius:26% 74% 61% 39% / 54% 67% 33% 46%;
+                opacity: .4;
+            }
+
+            10% {
+                transform: translate(5%, 1%) scale(1.1);
+                opacity: .2;
+                border-radius:74% 26% 47% 53% / 68% 46% 54% 32%
+            }
+
+            30% {
+                transform: translate(-7%, -3%);
+                opacity: .4;
+                border-radius:48% 52% 30% 70% / 27% 37% 63% 73%
+            }
+
+            50% {
+                transform: translate(0%, -5%) scale(1.2);
+                opacity: .2;
+                border-radius:73% 27% 57% 43% / 28% 67% 33% 72%
+            }
+
+            70% {
+                transform: translate(6%, 3%) scale(1.13);
+                opacity: .3;
+                border-radius:63% 37% 56% 44% / 25% 28% 72% 75%
+            }
+
+            90% {
+                transform: translate(-6%, -1%);
+                opacity: .1;
+                border-radius:39% 61% 70% 30% / 61% 29% 71% 39%
+            }
+        }
+
+                button {
+                    background: #EABE7C;
+                    border: 0;
+                    border-radius: 3px;
+                }
+
+                #start {
+                    width: 80px;
+                    height: 80px;
+                    position: absolute;
+                    top: 0;
+                    bottom: 0;
+                    left: 0;
+                    right: 0;
+                    margin: auto;
+                    margin-left: 74px;
+
+                    border: 0;
+                    background: transparent;
+                    box-sizing: border-box;
+                    width: 0;
+                    height: 74px;
+
+                    border-color: transparent transparent transparent #5168A7;
+                    transition: .15s all ease-in-out;
+                    cursor: pointer;
+
+                    
+                    border-style: solid;
+                    border-width: 37px 0 37px 60px;
+                }
+
+                #start.paused {
+                    border-style: double;
+                    border-width: 0px 0 0px 60px;
+                }
+
+                #start:hover {
+                    
+                    border-color: transparent transparent transparent #6279B8;
+                }
+
+                #stop {
+                    position: absolute;
+                    bottom: 0;
+                    right: 0;
+                }
+    </style>
+</head>
+<body>
+    <div id="titlecontainer">
+    <h1>Infinite Afternoon</h1>
+    </div>
+    <div class="themiddle second"></div>
+    <div class="themiddle third"></div>
+    <div class="themiddle fourth"></div>
+    <div class="themiddle fifth"></div>
+    <div class="themiddle">
+        <button id="start"></button>
+        <input id="volumecontrol" type="range" min="0" max="110" step="1" value="100" />
+        <p class="d-block d-sm-none">When listening on a phone, please unmute your device.</p>
+    </div>
+
+    <div class="noise"></div>
+
+    <script src="~/lib/jquery/dist/jquery.min.js"></script>
+    <script>
+        // Samples --> gainNode --> masterVolumeGainNode --> speakers
+
+        let audioContext;
+        let analyser;
+        let gainNode;
+        let masterVolumeGainNode;
+        let samples;
+        let nowPlaying = [];
+        let nowPlayingIntervals = [];
+
+        const samplePathDrone = ['/audio/drone.mp3'];
+        const samplePathsNotes = ['/audio/note1.mp3', '/audio/note2.mp3', '/audio/note3.mp3']
+
+        $('#volumecontrol').on('input', function () {
+            var volval = parseInt($(this).val()) / 100;
+            masterVolumeGainNode.gain.value = volval;
+        });
+
+        //startCtxBtn.addEventListener('click', () => {
+        $('#start').on('click', function () {
+            if($(this).hasClass('paused'))
+            {
+                gainNode.gain.exponentialRampToValueAtTime(1, audioContext.currentTime);
+                gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 2);
+
+                for(let i = 0; i < nowPlayingIntervals.length; i++)
+                {
+                    clearInterval(nowPlayingIntervals[i]);
+                }
+                console.log('Intervals cleared');
+
+                setTimeout(function () {
+                    for (let i = 0; i < nowPlaying.length; i++) {
+                        nowPlaying[i].stop()
+                    }
+                }, 2000);
+                $(this).removeClass('paused')
+                console.log('samples stopped');
+                return false;
+            }
+
+            audioContext = new AudioContext();
+            masterVolumeGainNode = audioContext.createGain();
+            masterVolumeGainNode.connect(audioContext.destination);
+
+            gainNode = audioContext.createGain();
+            gainNode.connect(masterVolumeGainNode);
+            console.log('audiocontext started...');
+
+            $(this).addClass('paused');
+
+            setupSamples(samplePathDrone).then((response) => {
+                samples = response;
+
+                gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime);
+                for (var i = 0; i < samples.length; i++) {
+                    console.log('initing sample ' + i);
+                    playSample(samples[i], 0, true);
+                }
+                gainNode.gain.exponentialRampToValueAtTime(1, audioContext.currentTime + 2);
+            });
+
+            setupSamples(samplePathsNotes).then((response) => {
+                samples = response;
+                let interval = 15000;
+
+                for (var i = 0; i < response.length; i++) {
+                    (function(i, interval) {
+                        let sampleInterval = setInterval(function() {
+                            playSample(response[i], 0, false);
+                            console.log('initing note ' + i + ' on interval ' + interval);
+                        }, interval)
+
+                        nowPlayingIntervals.push(sampleInterval);
+                    })(i, interval);
+
+                    interval += 2200;
+                }
+            });
+        });
+
+        $('#stop').on('click', function () {
+            gainNode.gain.exponentialRampToValueAtTime(1, audioContext.currentTime);
+            gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 2);
+
+            setTimeout(function () {
+                for (let i = 0; i < nowPlaying.length; i++) {
+                    nowPlaying[i].stop()
+                }
+            }, 4000);
+        });
+
+        async function getFile(path) {
+            const response = await fetch(path);
+            const arrayBuffer = await response.arrayBuffer();
+            const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
+            console.log('loaded file: ' + path);
+            return audioBuffer;
+        }
+
+        async function setupSamples(paths) {
+            console.log('loading audio...')
+            const audioBuffers = [];
+
+            for (const path of paths) {
+                const sample = await getFile(path);
+                audioBuffers.push(sample);
+            }
+
+            console.log('loaded audio')
+            return audioBuffers;
+        }
+
+        function playSample(audioBuffer, time, loop) {
+            const sampleSource = audioContext.createBufferSource();
+            sampleSource.buffer = audioBuffer;
+            sampleSource.loop = loop;
+
+            if (!loop) {
+                let panNode = audioContext.createStereoPanner();
+                var randomPanValue = 0; //change to random between -.8 and +.8
+                panNode.pan.setValueAtTime(randomPanValue, audioContext.currentTime);
+                console.log('panning to ' + randomPanValue);
+                sampleSource.connect(panNode);
+                panNode.connect(gainNode);
+            } else {
+                sampleSource.connect(gainNode);
+            }
+
+            sampleSource.start(time);
+
+            console.log('sample started and connected to gain node');
+            if(loop)
+                nowPlaying.push(sampleSource);
+
+            return sampleSource;
+        }</script>
+</body>
+</html>
