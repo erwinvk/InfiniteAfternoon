@@ -281,7 +281,7 @@
                     border-width: 37px 0 37px 60px;
                 }
 
-                #start.paused {
+                #start.pause {
                     border-style: double;
                     border-width: 0px 0 0px 60px;
                 }
@@ -317,6 +317,15 @@
     <script src="~/lib/jquery/dist/jquery.min.js"></script>
     <script>
         // Samples --> gainNode --> masterVolumeGainNode --> speakers
+        const minSineInterval = 19500;
+        const maxSineInterval = 44000;
+
+        const minSubInterval = 60000;
+        const maxSubInterval = 90000;
+
+        const minFXInterval = 5000;
+        const maxFXInterval = 10000;
+        let randomSineIntervals = [];
 
         let audioContext;
         let analyser;
@@ -326,8 +335,10 @@
         let nowPlaying = [];
         let nowPlayingIntervals = [];
 
-        const samplePathDrone = ['/audio/drone.mp3'];
-        const samplePathsNotes = ['/audio/note1.mp3', '/audio/note2.mp3', '/audio/note3.mp3']
+        const samplePathLoops = ['/audio/loop-drone.mp3'];
+        const samplePathsSines = ['/audio/sine-b4.mp3', '/audio/sine-d4.mp3','/audio/sine-e4.mp3','/audio/sine-f4.mp3','/audio/sine-gsharp4.mp3', '/audio/sine-d5.mp3'];
+        const samplePathsSubs = ['/audio/sub-e0.mp3'];
+        const samplePathsFX = [];
 
         $('#volumecontrol').on('input', function () {
             var volval = parseInt($(this).val()) / 100;
@@ -336,7 +347,7 @@
 
         //startCtxBtn.addEventListener('click', () => {
         $('#start').on('click', function () {
-            if($(this).hasClass('paused'))
+            if($(this).hasClass('pause'))
             {
                 gainNode.gain.exponentialRampToValueAtTime(1, audioContext.currentTime);
                 gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 2);
@@ -352,7 +363,7 @@
                         nowPlaying[i].stop()
                     }
                 }, 2000);
-                $(this).removeClass('paused')
+                $(this).removeClass('pause')
                 console.log('samples stopped');
                 return false;
             }
@@ -365,36 +376,77 @@
             gainNode.connect(masterVolumeGainNode);
             console.log('audiocontext started...');
 
-            $(this).addClass('paused');
+            $(this).addClass('pause');
 
-            setupSamples(samplePathDrone).then((response) => {
+            // Loads and play loops
+            setupSamples(samplePathLoops).then((response) => {
                 samples = response;
 
-                gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime);
                 for (var i = 0; i < samples.length; i++) {
                     console.log('initing sample ' + i);
                     playSample(samples[i], 0, true);
                 }
+
+                //fade them in
+                gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime);
                 gainNode.gain.exponentialRampToValueAtTime(1, audioContext.currentTime + 2);
             });
 
-            setupSamples(samplePathsNotes).then((response) => {
+            setupSamples(samplePathsSines).then((response) => {
                 samples = response;
-                let interval = 15000;
 
                 for (var i = 0; i < response.length; i++) {
+                    let interval = randomIntFromInterval(minSineInterval, maxSineInterval, 'sine');
+
                     (function(i, interval) {
                         let sampleInterval = setInterval(function() {
                             playSample(response[i], 0, false);
-                            console.log('initing note ' + i + ' on interval ' + interval);
                         }, interval)
 
                         nowPlayingIntervals.push(sampleInterval);
                     })(i, interval);
 
-                    interval += 2200;
+                    console.log('initing note ' + i + ' on interval ' + interval);
                 }
             });
+
+            // sub
+            setupSamples(samplePathsSubs).then((response) => {
+                samples = response;
+
+                for (var i = 0; i < response.length; i++) {
+                    let interval = randomIntFromInterval(minSubInterval, maxSubInterval, 'sub');
+
+                    (function(i, interval) {
+                        let sampleInterval = setInterval(function() {
+                            playSample(response[i], 0, false);
+                        }, interval)
+
+                        nowPlayingIntervals.push(sampleInterval);
+                    })(i, interval);
+
+                    console.log('initing note ' + i + ' on interval ' + interval);
+                }
+            });
+
+            // FX
+            //setupSamples(samplePathsFX).then((response) => {
+            //    samples = response;
+
+            //    for (var i = 0; i < response.length; i++) {
+            //        let interval = randomIntFromInterval(minFXInterval, maxFXInterval, 'fx');
+
+            //        (function(i, interval) {
+            //            let sampleInterval = setInterval(function() {
+            //                playSample(response[i], 0, false);
+            //            }, interval)
+
+            //            nowPlayingIntervals.push(sampleInterval);
+            //        })(i, interval);
+
+            //        console.log('initing note ' + i + ' on interval ' + interval);
+            //    }
+            //});
         });
 
         $('#stop').on('click', function () {
@@ -427,6 +479,28 @@
 
             console.log('loaded audio')
             return audioBuffers;
+        }
+
+        function randomIntFromInterval(min, max, type, isDeep) {
+            var randomNumber = Math.floor(Math.random() * (max - min + 1) + min)
+            
+            if(type == 'sine')
+            {
+                // check if note is not too close to others
+                for(let i = 0; i < randomSineIntervals.length; i++)
+                {
+                    if(Math.abs(randomSineIntervals[i] - randomNumber) < 2000)
+                    {
+                        console.log('rechoosing random... diff was ' + Math.abs(randomSineIntervals[i] - randomNumber));
+                        randomNumber = randomIntFromInterval(min, max, type, true);
+                    }
+                }
+
+                if(!isDeep)
+                    randomSineIntervals.push(randomNumber);
+            }
+
+            return randomNumber;
         }
 
         function playSample(audioBuffer, time, loop) {
