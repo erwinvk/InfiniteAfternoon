@@ -8,6 +8,10 @@
 
   <ItemGroup>
     <PackageReference Include="Microsoft.AspNetCore.Mvc.Razor.RuntimeCompilation" Version="6.0.9" />
+    <PackageReference Include="LibSassBuilder" Version="2.0.2" />
   </ItemGroup>
 
+  <ItemGroup>
+    <None Remove="LibSassBuilder" />
+  </ItemGroup>
 </Project>

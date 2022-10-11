@@ -1,4 +1,237 @@
-﻿// Please see documentation at https://docs.microsoft.com/aspnet/core/client-side/bundling-and-minification
-// for details on configuring this project to bundle and minify static web assets.
+﻿// Samples --> gainNode --> masterVolumeGainNode --> speakers
+const minSineInterval = 19500;
+const maxSineInterval = 44000;
 
-// Write your JavaScript code.
+const minSubInterval = 60000;
+const maxSubInterval = 90000;
+
+const minFXInterval = 5000;
+const maxFXInterval = 10000;
+let randomSineIntervals = [];
+
+let audioContext;
+let analyser;
+let gainNode;
+let masterVolumeGainNode;
+let samples;
+let nowPlaying = [];
+let nowPlayingIntervals = [];
+
+const samplePathLoops = ['/audio/loop-drone.mp3'];
+const samplePathsSines = ['/audio/sine-b4.mp3', '/audio/sine-d4.mp3', '/audio/sine-e4.mp3', '/audio/sine-f4.mp3', '/audio/sine-gsharp4.mp3', '/audio/sine-d5.mp3'];
+const samplePathsSubs = ['/audio/sub-e0.mp3'];
+const samplePathsFX = [];
+
+let sineDropYPositions = [];
+sineDropYPositions.push({ name:'d5', yval: '10%' });
+sineDropYPositions.push({ name: 'gsharp4', yval:'22%' });
+sineDropYPositions.push({ name: 'f4', yval: '35%' });
+sineDropYPositions.push({ name: 'e4', yval: '55%' });
+sineDropYPositions.push({ name: 'd4', yval: '65%' });
+sineDropYPositions.push({ name: 'b4', yval: '85%' });
+
+$('#volumecontrol').on('input', function () {
+    var volval = parseInt($(this).val()) / 100;
+    masterVolumeGainNode.gain.value = volval;
+});
+
+//startCtxBtn.addEventListener('click', () => {
+$('#start').on('click', function () {
+    if ($(this).hasClass('pause')) {
+        gainNode.gain.exponentialRampToValueAtTime(1, audioContext.currentTime);
+        gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 2);
+
+        for (let i = 0; i < nowPlayingIntervals.length; i++) {
+            clearInterval(nowPlayingIntervals[i]);
+        }
+        console.log('Intervals cleared');
+
+        setTimeout(function () {
+            for (let i = 0; i < nowPlaying.length; i++) {
+                nowPlaying[i].stop()
+            }
+        }, 2000);
+        $(this).removeClass('pause')
+        console.log('samples stopped');
+        return false;
+    }
+
+    audioContext = new AudioContext();
+    masterVolumeGainNode = audioContext.createGain();
+    masterVolumeGainNode.connect(audioContext.destination);
+
+    gainNode = audioContext.createGain();
+    gainNode.connect(masterVolumeGainNode);
+    console.log('audiocontext started...');
+
+    $(this).addClass('pause');
+
+    // Loads and play loops
+    setupSamples(samplePathLoops).then((response) => {
+        samples = response;
+
+        for (var i = 0; i < samples.length; i++) {
+            console.log('initing sample ' + i);
+            playSample(samples[i], 0, true);
+        }
+
+        //fade them in
+        gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime);
+        gainNode.gain.exponentialRampToValueAtTime(1, audioContext.currentTime + 2);
+    });
+
+    setupSamples(samplePathsSines).then((response) => {
+        samples = response;
+
+        for (var i = 0; i < response.length; i++) {
+            let interval = randomIntFromInterval(minSineInterval, maxSineInterval, 'sine');
+
+            (function (i, interval) {
+                let sampleInterval = setInterval(function () {
+                    var randomPan = (Math.ceil(Math.random() * 99) * (Math.round(Math.random()) ? 1 : -1)) / 100;
+
+                    playSample(response[i], 0, false, randomPan);
+
+
+                    randomPan += 1; //get off negative, range 0 - 2
+                    randomPan *= 50; // range 0 - 100
+                    showDrop(samplePathsSines[i], randomPan);
+                }, interval)
+
+                nowPlayingIntervals.push(sampleInterval);
+            })(i, interval);
+
+            console.log('initing note ' + i + ' on interval ' + interval);
+        }
+    });
+
+    // sub
+    setupSamples(samplePathsSubs).then((response) => {
+        samples = response;
+
+        for (var i = 0; i < response.length; i++) {
+            let interval = randomIntFromInterval(minSubInterval, maxSubInterval, 'sub');
+
+            (function (i, interval) {
+                let sampleInterval = setInterval(function () {
+                    playSample(response[i], 0, false);
+                }, interval)
+
+                nowPlayingIntervals.push(sampleInterval);
+            })(i, interval);
+
+            console.log('initing note ' + i + ' on interval ' + interval);
+        }
+    });
+
+    // FX
+    //setupSamples(samplePathsFX).then((response) => {
+    //    samples = response;
+
+    //    for (var i = 0; i < response.length; i++) {
+    //        let interval = randomIntFromInterval(minFXInterval, maxFXInterval, 'fx');
+
+    //        (function(i, interval) {
+    //            let sampleInterval = setInterval(function() {
+    //                playSample(response[i], 0, false);
+    //            }, interval)
+
+    //            nowPlayingIntervals.push(sampleInterval);
+    //        })(i, interval);
+
+    //        console.log('initing note ' + i + ' on interval ' + interval);
+    //    }
+    //});
+});
+
+$('#stop').on('click', function () {
+    gainNode.gain.exponentialRampToValueAtTime(1, audioContext.currentTime);
+    gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 2);
+
+    setTimeout(function () {
+        for (let i = 0; i < nowPlaying.length; i++) {
+            nowPlaying[i].stop()
+        }
+    }, 4000);
+});
+
+async function getFile(path) {
+    const response = await fetch(path);
+    const arrayBuffer = await response.arrayBuffer();
+    const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
+    console.log('loaded file: ' + path);
+    return audioBuffer;
+}
+
+async function setupSamples(paths) {
+    console.log('loading audio...')
+    const audioBuffers = [];
+
+    for (const path of paths) {
+        const sample = await getFile(path);
+        audioBuffers.push(sample);
+    }
+
+    console.log('loaded audio')
+    return audioBuffers;
+}
+
+function randomIntFromInterval(min, max, type, isDeep) {
+    var randomNumber = Math.floor(Math.random() * (max - min + 1) + min)
+
+    if (type == 'sine') {
+        // check if note is not too close to others
+        for (let i = 0; i < randomSineIntervals.length; i++) {
+            if (Math.abs(randomSineIntervals[i] - randomNumber) < 2000) {
+                console.log('rechoosing random... diff was ' + Math.abs(randomSineIntervals[i] - randomNumber));
+                randomNumber = randomIntFromInterval(min, max, type, true);
+            }
+        }
+
+        if (!isDeep)
+            randomSineIntervals.push(randomNumber);
+    }
+
+    return randomNumber;
+}
+
+function playSample(audioBuffer, time, loop, panVal) {
+    const sampleSource = audioContext.createBufferSource();
+    sampleSource.buffer = audioBuffer;
+    sampleSource.loop = loop;
+
+    if (panVal) {
+        let panNode = audioContext.createStereoPanner();
+        panNode.pan.setValueAtTime(panVal, audioContext.currentTime);
+        console.log('panning to ' + panVal);
+        sampleSource.connect(panNode);
+        panNode.connect(gainNode);
+    } else {
+        sampleSource.connect(gainNode);
+    }
+
+    sampleSource.start(time);
+
+    console.log('sample started and connected to gain node');
+    if (loop)
+        nowPlaying.push(sampleSource);
+
+    return sampleSource;
+}
+
+function showDrop(sampleName, xValue) {
+    var yValue = '50%';
+    sampleName = sampleName.replace('/audio/sine-', '').replace('.mp3', '');
+
+    for (var i = 0; i < sineDropYPositions.length; i++) {
+        if (sineDropYPositions[i].name == sampleName) {
+            yValue = sineDropYPositions[i].yval;
+        }
+    }
+
+    $('.dropscanvas').append('<div data-sample="' + sampleName + '" class="drop" style="top: ' + yValue + '; left: ' + xValue + '%"></div>');
+
+    setTimeout(function () {
+        $('.drop[data-sample="' + sampleName + '"]').remove();
+    }, 4000);
+}
