@@ -1,4 +1,15 @@
-﻿$lightAltColor: #AECFDF99;
+﻿$lightAltColor: #AECFDF;
+$lightAltColor80: #AECFDF99;
+$lightAltColor20: #AECFDF33;
+
+@font-face {
+    font-family: 'Staatliches';
+    src: url('/fonts/staatliches-v11-latin-regular.woff2') format('woff2');
+}
+
+h1, h2, h3 {
+    font-family: 'Staatliches';
+}
 
 body {
     background: #5168A7;
@@ -100,8 +111,8 @@ input {
 .themiddle {
     width: 200px;
     height: 200px;
-    background-color: $lightAltColor;
-    box-shadow: 0 0 2px $lightAltColor;
+    background-color: $lightAltColor80;
+    box-shadow: 0 0 2px $lightAltColor20;
     position: absolute;
     top: 0;
     bottom: 0;
@@ -111,15 +122,16 @@ input {
     border-radius: 999px;
     padding: 20px;
     transition: all 10s ease-in-out, transform 1s ease-in-out;
-    opacity: .8;
+    opacity: 1;
     animation: mainCircleFx 50s ease-in-out infinite;
 
     &:has(#start:hover) {
         transform: scale(1.05);
+        //opacity: .95;
     }
 
-    &:has(#start.paused) {
-        opacity: .7;
+    &:has(.pause) {
+        background: $lightAltColor20;
     }
 
     &.second {
@@ -141,7 +153,6 @@ input {
         background-color: #BEDFEF;
         z-index: -1;
         animation: circleFx 105s ease-in-out infinite;
-        //animation-delay: 55s;
         opacity: .3;
     }
 
@@ -149,7 +160,6 @@ input {
         background-color: #BDDEEE;
         z-index: -1;
         animation: circleFx 85s ease-in-out infinite alternate-reverse;
-        //animation-delay: 150s;
         opacity: .2;
     }
 }
@@ -283,8 +293,9 @@ button {
     border-width: 37px 0 37px 60px;
 
     &.pause {
-        border-style: double;
-        border-width: 0px 0 0px 60px;
+        border-style: solid;
+        border-width: 0 0 0 75px;
+        margin-left: 65px;
     }
 
     &:hover {
@@ -341,12 +352,12 @@ button {
 
     .drop {
         position: relative;
-        opacity: 0;
+        //opacity: 0;
         top: 10%;
         left: 10%;
-        width: 10px;
-        height: 10px;
-        border: $lightAltColor 1px solid;
+        width: 15px;
+        height: 15px;
+        border: #AECFDF00 2px solid;
         border-radius: 900px;
         animation-name: ripple;
         animation-duration: 3s;
@@ -355,12 +366,12 @@ button {
         &:after {
             content: '';
             position: absolute;
-            opacity: 0;
-            top: -3.5px;
-            left: -3.5px;
-            width: 15px;
-            height: 15px;
-            border: $lightAltColor 1px solid;
+            //opacity: 0;
+            top: -4.5px;
+            left: -4.5px;
+            width: 20px;
+            height: 20px;
+            border: #9DBECE00 1px solid;
             border-radius: 900px;
             animation-name: ripple-2;
             animation-duration: 4.5s;
@@ -371,32 +382,44 @@ button {
 
 @keyframes ripple {
     0% {
-        opacity: 0;
+        //opacity: 0;
+        border-color: #AECFDF00;
     }
 
     10% {
-        opacity: 1;
+        border-color: #AECFDFdd;
         transform: scale(1);
     }
 
     100% {
         transform: scale(3);
-        opacity: 0;
+        border-color: #AECFDF00;
     }
 }
 
 @keyframes ripple-2 {
     0% {
-        opacity: 0;
+        border-color: #9DBECE00;
+        opacity: 1;
     }
 
     10% {
-        opacity: .7;
+        border-color: #9DBECEdd;
         transform: scale(1);
     }
 
     100% {
-        opacity: 0;
+        border-color: #9DBECE00;
         transform: scale(2.5);
+        opacity: 0;
     }
+}
+
+.time {
+   position: fixed;
+   bottom: 5px;
+   right: 5px;
+   font-size: .8em;
+   color: $lightAltColor80;
+   font-family: 'Staatliches';
 }

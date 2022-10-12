@@ -1,4 +1,5 @@
 ﻿// Samples --> gainNode --> masterVolumeGainNode --> speakers
+var startTime;
 const minSineInterval = 19500;
 const maxSineInterval = 44000;
 
@@ -50,6 +51,11 @@ $('#start').on('click', function () {
             for (let i = 0; i < nowPlaying.length; i++) {
                 nowPlaying[i].stop()
             }
+
+            // clear these
+            nowPlaying = [];
+            nowPlayingIntervals = [];
+
         }, 2000);
         $(this).removeClass('pause')
         console.log('samples stopped');
@@ -155,6 +161,10 @@ $('#start').on('click', function () {
     //        console.log('initing note ' + i + ' on interval ' + interval);
     //    }
     //});
+
+    // set start time
+    startTime = new Date();
+    displayTimeElapsed();
 });
 
 $('#stop').on('click', function () {
@@ -216,7 +226,7 @@ function playSample(audioBuffer, time, loop, panVal) {
     if (panVal) {
         let panNode = audioContext.createStereoPanner();
         panNode.pan.setValueAtTime(panVal, audioContext.currentTime);
-        console.log('panning to ' + panVal);
+        //console.log('panning to ' + panVal);
         sampleSource.connect(panNode);
         panNode.connect(gainNode);
     } else {
@@ -225,7 +235,7 @@ function playSample(audioBuffer, time, loop, panVal) {
 
     sampleSource.start(time);
 
-    console.log('sample started and connected to gain node');
+    //console.log('sample started and connected to gain node');
     if (loop)
         nowPlaying.push(sampleSource);
 
@@ -242,7 +252,6 @@ function showDrop(sampleName, xValue) {
         }
     }
 
-    console.log('showing ' + sampleName + '  X: ' + xValue + ' Y: ' + yValue);
     $('.dropscanvas').append('<div data-sample="' + sampleName + '" class="drop" style="top: ' + yValue + '; left: ' + xValue + '%"></div>');
 
     setTimeout(function () {
@@ -252,8 +261,54 @@ function showDrop(sampleName, xValue) {
 
 $('.openinfo').on('click', function () {
     if ($('.info').hasClass('hidden')) {
+        $('.infocontainer').show();
         $('.info').removeClass('hidden');
     } else {
         $('.info').addClass('hidden');
+        setTimeout(function () {
+            $('.infocontainer').hide();
+        }, 1000);
     }
+    return false;
 });
+
+function displayTimeElapsed() {
+    var endTime = new Date();
+    var timeDiff = endTime - startTime;
+    timeDiff /= 1000;
+
+    // remove seconds from the date
+    timeDiff = Math.floor(timeDiff / 60);
+
+    // get minutes
+    var minutes = Math.round(timeDiff % 60);
+
+    // remove minutes from the date
+    timeDiff = Math.floor(timeDiff / 60);
+
+    // get hours
+    var hours = Math.round(timeDiff % 24);
+
+    var timetext = 'listened for ';
+    if (hours == 1) {
+        timetext += '1 hour';
+    } else if (hours > 1) {
+        timetext += (hours + ' hours');
+    }
+
+    if (hours > 0 && minutes > 0) {
+        timetext += ', ';
+    }
+
+    if (minutes == 1) {
+        timetext += '1 minute';
+    } else if (minutes > 1) {
+        timetext += (minutes + ' minutes');
+    }
+
+    if (hours > 0 || minutes > 0) {
+        $('.time').text(timetext);
+    };
+    setTimeout(displayTimeElapsed, 5000);
+
+}
