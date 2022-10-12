@@ -24,11 +24,11 @@ const samplePathsFX = [];
 
 let sineDropYPositions = [];
 sineDropYPositions.push({ name:'d5', yval: '10%' });
-sineDropYPositions.push({ name: 'gsharp4', yval:'22%' });
+sineDropYPositions.push({ name: 'b4', yval: '25%' });
 sineDropYPositions.push({ name: 'f4', yval: '35%' });
 sineDropYPositions.push({ name: 'e4', yval: '55%' });
 sineDropYPositions.push({ name: 'd4', yval: '65%' });
-sineDropYPositions.push({ name: 'b4', yval: '85%' });
+sineDropYPositions.push({ name: 'gsharp4', yval:'80%' });
 
 $('#volumecontrol').on('input', function () {
     var volval = parseInt($(this).val()) / 100;
@@ -71,7 +71,7 @@ $('#start').on('click', function () {
         samples = response;
 
         for (var i = 0; i < samples.length; i++) {
-            console.log('initing sample ' + i);
+            console.log('initing loop ' + i);
             playSample(samples[i], 0, true);
         }
 
@@ -83,6 +83,20 @@ $('#start').on('click', function () {
     setupSamples(samplePathsSines).then((response) => {
         samples = response;
 
+        // play a random single one before the first loop starts
+        
+        setTimeout(function () {
+            var randomPan = (Math.ceil(Math.random() * 99) * (Math.round(Math.random()) ? 1 : -1)) / 100;
+            var randomSampleNumber = Math.floor(Math.random() * response.length);
+
+            playSample(response[randomSampleNumber], 0, false, randomPan);
+
+            randomPan += 1; //get off negative, range 0 - 2
+            randomPan *= 50; // range 0 - 100
+            showDrop(samplePathsSines[randomSampleNumber], randomPan);
+        }, randomIntFromInterval(6000, 13500, 'firstrandomnote'));
+        // end first single one
+
         for (var i = 0; i < response.length; i++) {
             let interval = randomIntFromInterval(minSineInterval, maxSineInterval, 'sine');
 
@@ -91,7 +105,6 @@ $('#start').on('click', function () {
                     var randomPan = (Math.ceil(Math.random() * 99) * (Math.round(Math.random()) ? 1 : -1)) / 100;
 
                     playSample(response[i], 0, false, randomPan);
-
 
                     randomPan += 1; //get off negative, range 0 - 2
                     randomPan *= 50; // range 0 - 100
@@ -229,9 +242,18 @@ function showDrop(sampleName, xValue) {
         }
     }
 
+    console.log('showing ' + sampleName + '  X: ' + xValue + ' Y: ' + yValue);
     $('.dropscanvas').append('<div data-sample="' + sampleName + '" class="drop" style="top: ' + yValue + '; left: ' + xValue + '%"></div>');
 
     setTimeout(function () {
         $('.drop[data-sample="' + sampleName + '"]').remove();
-    }, 4000);
+    }, 5000);
 }
+
+$('.openinfo').on('click', function () {
+    if ($('.info').hasClass('hidden')) {
+        $('.info').removeClass('hidden');
+    } else {
+        $('.info').addClass('hidden');
+    }
+});

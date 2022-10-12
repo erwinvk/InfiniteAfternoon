@@ -5,7 +5,11 @@ body {
 }
 
 a {
-    color: #fff;
+    color: $lightAltColor;
+
+    &:hover {
+        color: #fff;
+    }
 }
 
 input {
@@ -114,10 +118,15 @@ input {
         transform: scale(1.05);
     }
 
+    &:has(#start.paused) {
+        opacity: .7;
+    }
+
     &.second {
         background-color: #BEDFEF;
         z-index: -1;
         animation: circleFx 50s ease-in-out infinite;
+        filter: fliph;
         opacity: .3;
     }
 
@@ -131,16 +140,16 @@ input {
     &.fourth {
         background-color: #BEDFEF;
         z-index: -1;
-        animation: circleFx 35s ease-in-out infinite;
-        animation-delay: 55s;
+        animation: circleFx 105s ease-in-out infinite;
+        //animation-delay: 55s;
         opacity: .3;
     }
 
     &.fifth {
         background-color: #BDDEEE;
         z-index: -1;
-        animation: circleFx 25s ease-in-out infinite alternate-reverse;
-        animation-delay: 150s;
+        animation: circleFx 85s ease-in-out infinite alternate-reverse;
+        //animation-delay: 150s;
         opacity: .2;
     }
 }
@@ -289,6 +298,17 @@ button {
     right: 0;
 }
 
+.openinfo {
+    display: block;
+    position: absolute;
+    top: 250px;
+    left: 68px;
+    text-align: center;
+    font-family: 'Staatliches';
+    font-size: 2em;
+    color: $lightAltColor;
+}
+
 .info {
     display: block;
     position: absolute;
@@ -298,6 +318,14 @@ button {
     padding: 30px;
     margin: 0 auto;
     background: #AECFDF99;
+    opacity: 1;
+    visibility: visible;
+    transition: opacity .7s ease-in-out;
+
+    &.hidden {
+        visibility:hidden;
+        opacity: 0;
+    }
 
     h6 {
         font-weight: bold;
@@ -318,10 +346,10 @@ button {
         left: 10%;
         width: 10px;
         height: 10px;
-        border: #fff 1px solid;
+        border: $lightAltColor 1px solid;
         border-radius: 900px;
         animation-name: ripple;
-        animation-duration: 2s;
+        animation-duration: 3s;
         animation-iteration-count: 1;
 
         &:after {
@@ -332,10 +360,10 @@ button {
             left: -3.5px;
             width: 15px;
             height: 15px;
-            border: #FFF 1px solid;
+            border: $lightAltColor 1px solid;
             border-radius: 900px;
             animation-name: ripple-2;
-            animation-duration: 2.9s;
+            animation-duration: 4.5s;
             animation-iteration-count: 1;
         }
     }
@@ -348,6 +376,7 @@ button {
 
     10% {
         opacity: 1;
+        transform: scale(1);
     }
 
     100% {
@@ -363,6 +392,7 @@ button {
 
     10% {
         opacity: .7;
+        transform: scale(1);
     }
 
     100% {
