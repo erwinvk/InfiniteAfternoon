@@ -1,14 +1,22 @@
 ﻿// Samples --> gainNode --> masterVolumeGainNode --> speakers
 var startTime;
-const minSineInterval = 19500;
+//const minSineInterval = 3000; // test
+//const maxSineInterval = 20000; // test
+const minSineInterval = 12500;
 const maxSineInterval = 44000;
 
-const minSubInterval = 60000;
-const maxSubInterval = 90000;
+//const minSubInterval = 1000; // test
+//const maxSubInterval = 6000; // test
+const minSubInterval = 60000; // 1 minute
+const maxSubInterval = 300000; // 5 minutes
 
-const minFXInterval = 5000;
-const maxFXInterval = 10000;
+//const minFXInterval = 2000;
+//const maxFXInterval = 20000; 
+const minFXInterval = 45000; 
+const maxFXInterval = 900000; // 15 minutes
+
 let randomSineIntervals = [];
+let randomFxIntervals = [];
 
 let audioContext;
 let analyser;
@@ -20,8 +28,8 @@ let nowPlayingIntervals = [];
 
 const samplePathLoops = ['/audio/loop-drone.mp3'];
 const samplePathsSines = ['/audio/sine-b4.mp3', '/audio/sine-d4.mp3', '/audio/sine-e4.mp3', '/audio/sine-f4.mp3', '/audio/sine-gsharp4.mp3', '/audio/sine-d5.mp3'];
-const samplePathsSubs = ['/audio/sub-e0.mp3'];
-const samplePathsFX = [];
+const samplePathsSubs = ['/audio/sub-e0.mp3', '/audio/sub-e0-2.mp3'];
+const samplePathsFX = ['/audio/fx-birdlike.mp3', '/audio/fx-triangle.mp3', '/audio/fx-pizzi1.mp3', '/audio/fx-pizzi2.mp3', '/audio/fx-pizzi3.mp3', '/audio/fx-pizzi4.mp3', '/audio/fx-pizzi5.mp3'];
 
 let sineDropYPositions = [];
 sineDropYPositions.push({ name:'d5', yval: '10%' });
@@ -90,17 +98,16 @@ $('#start').on('click', function () {
         samples = response;
 
         // play a random single one before the first loop starts
-        
-        setTimeout(function () {
-            var randomPan = (Math.ceil(Math.random() * 99) * (Math.round(Math.random()) ? 1 : -1)) / 100;
-            var randomSampleNumber = Math.floor(Math.random() * response.length);
+        //setTimeout(function () {
+        //    var randomPan = (Math.ceil(Math.random() * 99) * (Math.round(Math.random()) ? 1 : -1)) / 100;
+        //    var randomSampleNumber = Math.floor(Math.random() * response.length);
 
-            playSample(response[randomSampleNumber], 0, false, randomPan);
+        //    playSample(response[randomSampleNumber], 0, false, randomPan);
 
-            randomPan += 1; //get off negative, range 0 - 2
-            randomPan *= 50; // range 0 - 100
-            showDrop(samplePathsSines[randomSampleNumber], randomPan);
-        }, randomIntFromInterval(6000, 13500, 'firstrandomnote'));
+        //    randomPan += 1; //get off negative, range 0 - 2
+        //    randomPan *= 50; // range 0 - 100
+        //    showDrop(samplePathsSines[randomSampleNumber], randomPan);
+        //}, randomIntFromInterval(6000, 10000, 'firstrandomnote'));
         // end first single one
 
         for (var i = 0; i < response.length; i++) {
@@ -124,16 +131,35 @@ $('#start').on('click', function () {
         }
     });
 
-    // sub
+    // subs. Don't want these possibly looping over another, so pick a random interval and at that interval play one of the subs.
     setupSamples(samplePathsSubs).then((response) => {
+        samples = response;
+        let interval = randomIntFromInterval(minSubInterval, maxSubInterval, 'sub');
+
+        (function (interval) {
+            let sampleInterval = setInterval(function () {
+                //pick a random sub sample
+                var randomSampleNumber = Math.floor(Math.random() * response.length);
+
+                playSample(response[randomSampleNumber], 0, false);
+            }, interval)
+
+            nowPlayingIntervals.push(sampleInterval);
+        })(interval);
+    });
+
+    // FX
+    setupSamples(samplePathsFX).then((response) => {
         samples = response;
 
         for (var i = 0; i < response.length; i++) {
-            let interval = randomIntFromInterval(minSubInterval, maxSubInterval, 'sub');
+            let interval = randomIntFromInterval(minFXInterval, maxFXInterval, 'fx');
 
-            (function (i, interval) {
+            (function(i, interval) {
                 let sampleInterval = setInterval(function () {
-                    playSample(response[i], 0, false);
+                    var randomPan = (Math.ceil(Math.random() * 99) * (Math.round(Math.random()) ? 1 : -1)) / 100;
+                    playSample(response[i], 0, false, randomPan);
+                    console.log('now playing FX ' + interval);
                 }, interval)
 
                 nowPlayingIntervals.push(sampleInterval);
@@ -142,25 +168,6 @@ $('#start').on('click', function () {
             console.log('initing note ' + i + ' on interval ' + interval);
         }
     });
-
-    // FX
-    //setupSamples(samplePathsFX).then((response) => {
-    //    samples = response;
-
-    //    for (var i = 0; i < response.length; i++) {
-    //        let interval = randomIntFromInterval(minFXInterval, maxFXInterval, 'fx');
-
-    //        (function(i, interval) {
-    //            let sampleInterval = setInterval(function() {
-    //                playSample(response[i], 0, false);
-    //            }, interval)
-
-    //            nowPlayingIntervals.push(sampleInterval);
-    //        })(i, interval);
-
-    //        console.log('initing note ' + i + ' on interval ' + interval);
-    //    }
-    //});
 
     // set start time
     startTime = new Date();
@@ -214,6 +221,18 @@ function randomIntFromInterval(min, max, type, isDeep) {
         if (!isDeep)
             randomSineIntervals.push(randomNumber);
     }
+    else if (type == 'fx') {
+        // want fx at least 10 seconds apart initially
+        for (let i = 0; i < randomFxIntervals.length; i++) {
+            if (Math.abs(randomFxIntervals[i] - randomNumber) < 10000) {
+                console.log('rechoosing random... diff was ' + Math.abs(randomFxIntervals[i] - randomNumber));
+                randomNumber = randomIntFromInterval(min, max, type, true);
+            }
+        }
+
+        if (!isDeep)
+            randomFxIntervals.push(randomNumber);
+    }
 
     return randomNumber;
 }
@@ -256,7 +275,7 @@ function showDrop(sampleName, xValue) {
 
     setTimeout(function () {
         $('.drop[data-sample="' + sampleName + '"]').remove();
-    }, 5000);
+    }, 5500);
 }
 
 $('.openinfo').on('click', function () {
