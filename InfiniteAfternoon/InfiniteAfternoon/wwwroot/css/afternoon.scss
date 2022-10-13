@@ -1,6 +1,8 @@
 ﻿$lightAltColor: #AECFDF;
-$lightAltColor80: #AECFDF99;
+$lightAltColor60: #AECFDF99;
+$lightAltColor80: #AECFDFCC;
 $lightAltColor20: #AECFDF33;
+$lightAltColor10: #AECFDF11;
 
 @font-face {
     font-family: 'Staatliches';
@@ -35,6 +37,7 @@ input {
     z-index: -1;
 
     h1 {
+        will-change: transform;
         user-select: none;
         display: flex;
         justify-content: center;
@@ -50,6 +53,7 @@ input {
         background-size: 200% 200%;
         -webkit-background-clip: text;
         -webkit-text-fill-color: transparent;
+        transform: translateZ(0);
     }
 }
 
@@ -58,13 +62,11 @@ input {
     100% {
         transform: scale(1);
         opacity: .2;
-        background-position-y: 70%;
     }
 
     50% {
         transform: scale(1.04);
         opacity: .4;
-        background-position-y: -100px;
     }
 }
 
@@ -111,7 +113,7 @@ input {
 .themiddle {
     width: 200px;
     height: 200px;
-    background-color: $lightAltColor80;
+    background-color: $lightAltColor60;
     box-shadow: 0 0 2px $lightAltColor20;
     position: absolute;
     top: 0;
@@ -124,6 +126,7 @@ input {
     transition: all 10s ease-in-out, transform 1s ease-in-out;
     opacity: 1;
     animation: mainCircleFx 50s ease-in-out infinite;
+    transform: translateZ(0);
 
     &:has(#start:hover) {
         transform: scale(1.05);
@@ -169,6 +172,16 @@ input {
     bottom: -40px;
     left: 0;
     width: 100%;
+
+    &:after {
+        content: 'vol';
+        position: absolute;
+        color: $lightAltColor60;
+        right: -30px;
+        top: -10px;
+        text-transform: uppercase;
+        font-family: 'Staatliches', sans-serif;
+    }
 }
 
 input[type=range] {
@@ -180,16 +193,18 @@ input[type=range] {
         width: 100%;
         height: 2px;
         cursor: pointer;
-        background: #fff;
+        background: rgb(81,104,167);
+        background: linear-gradient(90deg, rgba(81,104,167,1) 0%, rgba(174,207,223,1) 20%, rgba(174,207,223,1) 80%, rgba(81,104,167,1) 100%);
         border-radius: 25px;
-        border: 0px solid #000101;
+        //border: 0px solid #000101;
     }
 
     &::-webkit-slider-thumb {
-        border: 0px solid #000000;
+        border: 0px solid $lightAltColor80;
         height: 20px;
-        width: 5px;
-        background: #fff;
+        width: 20px;
+        border-radius: 20px;
+        background: $lightAltColor80;
         cursor: pointer;
         -webkit-appearance: none;
         margin-top: -8px;
@@ -200,7 +215,7 @@ input[type=range] {
         height: 12.8px;
         cursor: pointer;
         animate: 0.2s;
-        background: #fff;
+        background: $lightAltColor20;
         border-radius: 25px;
     }
 
@@ -208,7 +223,7 @@ input[type=range] {
         height: 20px;
         width: 39px;
         border-radius: 7px;
-        background: #fff;
+        background: $lightAltColor60;
         cursor: pointer;
     }
 }
@@ -422,11 +437,47 @@ button {
     }
 }
 
+.share {
+    display: block;
+    width: 24px;
+    height: 24px;
+    position: fixed;
+    bottom: 5px;
+    right: 5px;
+
+    &:after {
+        content: 'share';
+        position: absolute;
+        top: -35px;
+        right: 0;
+        padding: 3px 10px;
+        background: $lightAltColor10;
+        border: 1px solid $lightAltColor80;
+        border-radius: 10px;
+        color: $lightAltColor80;
+        font-family: 'Staatliches';
+        font-size: 1em;
+        opacity: 0;
+        visibility: hidden;
+        transition: all .3s ease-in-out;
+    }
+
+    &:hover:after {
+        visibility: visible;
+        opacity: 1;
+    }
+
+    &.copied:after {
+        content: 'copied';
+        opacity: 1;
+    }
+}
+
 .time {
    position: fixed;
    bottom: 5px;
-   right: 5px;
-   font-size: .8em;
-   color: $lightAltColor80;
+   right: 35px;
+   font-size: 1em;
+   color: $lightAltColor60;
    font-family: 'Staatliches';
 }

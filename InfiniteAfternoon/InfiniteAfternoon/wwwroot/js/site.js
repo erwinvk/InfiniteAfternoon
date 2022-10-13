@@ -291,6 +291,28 @@ $('.openinfo').on('click', function () {
     return false;
 });
 
+$('.share').on('click', function () {
+    copyShareText();
+});
+
+function copyShareText() {
+    // Get the text field
+    var timetext = getTimeString();
+    let copyText = '';
+    if (timetext.length == 0) {
+        copyText = 'I am almost listening to infiniteafternoon.com';
+    } else {
+        copyText = 'I listened to infiniteafternoon.com for ' + timetext + '.';
+    }
+
+    $('.share').addClass('copied');
+    navigator.clipboard.writeText(copyText);
+
+    setTimeout(function () {
+        $('.share').removeClass('copied');
+    }, 5000)
+}
+
 function displayTimeElapsed() {
     var endTime = new Date();
     var timeDiff = endTime - startTime;
@@ -307,8 +329,34 @@ function displayTimeElapsed() {
 
     // get hours
     var hours = Math.round(timeDiff % 24);
+    var timetext = getTimeString();
 
-    var timetext = 'listened for ';
+    if (timetext.length > 0) {
+        var timetext = 'listened for ' + timetext;
+    }
+
+    $('.time').text(timetext);
+    setTimeout(displayTimeElapsed, 5000);
+}
+
+function getTimeString() {
+    var endTime = new Date();
+    var timeDiff = endTime - startTime;
+    timeDiff /= 1000;
+
+    // remove seconds from the date
+    timeDiff = Math.floor(timeDiff / 60);
+
+    // get minutes
+    var minutes = Math.round(timeDiff % 60);
+
+    // remove minutes from the date
+    timeDiff = Math.floor(timeDiff / 60);
+
+    // get hours
+    var hours = Math.round(timeDiff % 24);
+
+    var timetext = '';
     if (hours == 1) {
         timetext += '1 hour';
     } else if (hours > 1) {
@@ -316,7 +364,7 @@ function displayTimeElapsed() {
     }
 
     if (hours > 0 && minutes > 0) {
-        timetext += ', ';
+        timetext += ' and ';
     }
 
     if (minutes == 1) {
@@ -325,9 +373,5 @@ function displayTimeElapsed() {
         timetext += (minutes + ' minutes');
     }
 
-    if (hours > 0 || minutes > 0) {
-        $('.time').text(timetext);
-    };
-    setTimeout(displayTimeElapsed, 5000);
-
+    return timetext;
 }
