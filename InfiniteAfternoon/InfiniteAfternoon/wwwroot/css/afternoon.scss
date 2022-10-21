@@ -481,3 +481,19 @@ button {
    color: $lightAltColor60;
    font-family: 'Staatliches';
 }
+
+#tag {
+    display: block;
+    font-family: Courier New, Courier, Monospace;
+    font-weight: bold;
+    line-height: .65em;
+    color: $lightAltColor60;
+    position: fixed;
+    bottom: 5px;
+    left: 5px;
+    transition: all .2s ease-in-out;
+
+    &:hover {
+        color: $lightAltColor80;
+    }
+}
