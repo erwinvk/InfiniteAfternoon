@@ -1,5 +1,7 @@
 ﻿// Samples --> gainNode --> masterVolumeGainNode --> speakers
 var startTime;
+
+const deltaTimeWarp = 25000; // fast forward 25 s so no big silence at the start
 //const minSineInterval = 3000; // test
 //const maxSineInterval = 20000; // test
 const minSineInterval = 12500;
@@ -34,10 +36,10 @@ const samplePathsFX = ['/audio/fx-birdlike.mp3', '/audio/fx-triangle.mp3', '/aud
 let sineDropYPositions = [];
 sineDropYPositions.push({ name:'d5', yval: '10%' });
 sineDropYPositions.push({ name: 'b4', yval: '25%' });
-sineDropYPositions.push({ name: 'f4', yval: '35%' });
-sineDropYPositions.push({ name: 'e4', yval: '55%' });
-sineDropYPositions.push({ name: 'd4', yval: '65%' });
-sineDropYPositions.push({ name: 'gsharp4', yval:'80%' });
+sineDropYPositions.push({ name: 'gsharp4', yval:'35%' });
+sineDropYPositions.push({ name: 'f4', yval: '55%' });
+sineDropYPositions.push({ name: 'e4', yval: '65%' });
+sineDropYPositions.push({ name: 'd4', yval: '85%' });
 
 $('#volumecontrol').on('input', function () {
     var volval = parseInt($(this).val()) / 100;
@@ -63,7 +65,6 @@ $('#start').on('click', function () {
             // clear these
             nowPlaying = [];
             nowPlayingIntervals = [];
-
         }, 2000);
         $(this).removeClass('pause')
         console.log('samples stopped');
@@ -97,24 +98,11 @@ $('#start').on('click', function () {
     setupSamples(samplePathsSines).then((response) => {
         samples = response;
 
-        // play a random single one before the first loop starts
-        //setTimeout(function () {
-        //    var randomPan = (Math.ceil(Math.random() * 99) * (Math.round(Math.random()) ? 1 : -1)) / 100;
-        //    var randomSampleNumber = Math.floor(Math.random() * response.length);
-
-        //    playSample(response[randomSampleNumber], 0, false, randomPan);
-
-        //    randomPan += 1; //get off negative, range 0 - 2
-        //    randomPan *= 50; // range 0 - 100
-        //    showDrop(samplePathsSines[randomSampleNumber], randomPan);
-        //}, randomIntFromInterval(6000, 10000, 'firstrandomnote'));
-        // end first single one
-
         for (var i = 0; i < response.length; i++) {
             let interval = randomIntFromInterval(minSineInterval, maxSineInterval, 'sine');
 
             (function (i, interval) {
-                let sampleInterval = setInterval(function () {
+                let sampleInterval = customInterval(function () {
                     var randomPan = (Math.ceil(Math.random() * 99) * (Math.round(Math.random()) ? 1 : -1)) / 100;
 
                     playSample(response[i], 0, false, randomPan);
@@ -122,7 +110,7 @@ $('#start').on('click', function () {
                     randomPan += 1; //get off negative, range 0 - 2
                     randomPan *= 50; // range 0 - 100
                     showDrop(samplePathsSines[i], randomPan);
-                }, interval)
+                }, interval, true)
 
                 nowPlayingIntervals.push(sampleInterval);
             })(i, interval);
@@ -137,7 +125,7 @@ $('#start').on('click', function () {
         let interval = randomIntFromInterval(minSubInterval, maxSubInterval, 'sub');
 
         (function (interval) {
-            let sampleInterval = setInterval(function () {
+            let sampleInterval = customInterval(function () {
                 //pick a random sub sample
                 var randomSampleNumber = Math.floor(Math.random() * response.length);
 
@@ -156,11 +144,11 @@ $('#start').on('click', function () {
             let interval = randomIntFromInterval(minFXInterval, maxFXInterval, 'fx');
 
             (function(i, interval) {
-                let sampleInterval = setInterval(function () {
+                let sampleInterval = customInterval(function () {
                     var randomPan = (Math.ceil(Math.random() * 99) * (Math.round(Math.random()) ? 1 : -1)) / 100;
                     playSample(response[i], 0, false, randomPan);
                     console.log('now playing FX ' + interval);
-                }, interval)
+                }, interval, true)
 
                 nowPlayingIntervals.push(sampleInterval);
             })(i, interval);
@@ -184,6 +172,26 @@ $('#stop').on('click', function () {
         }
     }, 4000);
 });
+
+function customInterval(callback, interval, isFirst) {
+    // fast forward first loop... maybe!
+    let tempInterval = interval;
+    if (isFirst) {
+        tempInterval -= deltaTimeWarp;
+        // if the interval is now before our start, do original interval, minus the difference
+        if (tempInterval < 0) {
+            let delta = interval - deltaTimeWarp;
+            tempInterval = (interval  - Math.abs(delta));
+        }
+
+        console.log('temp interval: ' + tempInterval + ' interval:' + interval);
+    }
+    
+    var timeout = setTimeout(function () {
+        callback();
+        customInterval(callback, interval, false);
+    }, tempInterval);
+}
 
 async function getFile(path) {
     const response = await fetch(path);
@@ -367,7 +375,9 @@ function getTimeString() {
         timetext += ' and ';
     }
 
-    if (minutes == 1) {
+    if (minutes == 0 && hours == 0) {
+        timetext += 'under a minute';
+    } else if (minutes == 1) {
         timetext += '1 minute';
     } else if (minutes > 1) {
         timetext += (minutes + ' minutes');
