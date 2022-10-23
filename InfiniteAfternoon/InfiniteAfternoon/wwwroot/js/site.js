@@ -4,7 +4,7 @@ var startTime;
 const deltaTimeWarp = 25000; // fast forward 25 s so no big silence at the start
 //const minSineInterval = 3000; // test
 //const maxSineInterval = 20000; // test
-const minSineInterval = 12500;
+const minSineInterval = 17500;
 const maxSineInterval = 44000;
 
 //const minSubInterval = 1000; // test
@@ -20,6 +20,7 @@ const maxFXInterval = 900000; // 15 minutes
 let randomSineIntervals = [];
 let randomFxIntervals = [];
 
+let isPlaying = false;
 let audioContext;
 let analyser;
 let gainNode;
@@ -68,6 +69,7 @@ $('#start').on('click', function () {
         }, 2000);
         $(this).removeClass('pause')
         console.log('samples stopped');
+        isPlaying = false;
         return false;
     }
 
@@ -158,6 +160,7 @@ $('#start').on('click', function () {
     });
 
     // set start time
+    isPlaying = true;
     startTime = new Date();
     displayTimeElapsed();
 });
@@ -174,7 +177,7 @@ $('#stop').on('click', function () {
 });
 
 function customInterval(callback, interval, isFirst) {
-    // fast forward first loop... maybe!
+    // fast forward first loop... 
     let tempInterval = interval;
     if (isFirst) {
         tempInterval -= deltaTimeWarp;
@@ -188,9 +191,11 @@ function customInterval(callback, interval, isFirst) {
     }
     
     var timeout = setTimeout(function () {
-        callback();
-        customInterval(callback, interval, false);
-    }, tempInterval);
+        if (isPlaying) {
+            callback();
+            customInterval(callback, interval, false);
+        }
+    }, Math.abs(tempInterval));
 }
 
 async function getFile(path) {
