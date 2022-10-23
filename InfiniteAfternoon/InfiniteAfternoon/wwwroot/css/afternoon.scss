@@ -37,6 +37,7 @@ input {
     z-index: -1;
     display: flex;
     align-items: center;
+    justify-content: center;
     animation: titlefadestart 5s ease-out 1;
 
     h1 {
