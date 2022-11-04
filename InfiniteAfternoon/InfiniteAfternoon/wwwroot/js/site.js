@@ -25,6 +25,8 @@ let audioContext;
 let analyser;
 let gainNode;
 let masterVolumeGainNode;
+let masterDelayGainNode;
+let masterDelayNode;
 let samples;
 let nowPlaying = [];
 let nowPlayingIntervals = [];
@@ -79,6 +81,24 @@ $('#start').on('click', function () {
 
     gainNode = audioContext.createGain();
     gainNode.connect(masterVolumeGainNode);
+
+    masterDelayFeedbackNode = audioContext.createGain();
+    //masterDelayGainNode.connect(gainNode);
+    masterDelayFeedbackNode.gain.value = 0.3;
+
+    var biquadFilter = audioContext.createBiquadFilter();
+    biquadFilter.type = biquadFilter.LOWPASS;
+    biquadFilter.frequency.value = 600;
+    //biquadFilter.Q.value = 20;
+
+    masterDelayNode = audioContext.createDelay(3);
+    masterDelayNode.delayTime.value = 1.4;
+    masterDelayNode.connect(biquadFilter);
+    biquadFilter.connect(masterDelayFeedbackNode);
+    //masterDelayNode.connect(gainNode);
+    masterDelayFeedbackNode.connect(masterDelayNode);
+    masterDelayFeedbackNode.connect(gainNode);
+
     console.log('audiocontext started...');
 
     $(this).addClass('pause');
@@ -261,6 +281,7 @@ function playSample(audioBuffer, time, loop, panVal) {
         //console.log('panning to ' + panVal);
         sampleSource.connect(panNode);
         panNode.connect(gainNode);
+        panNode.connect(masterDelayNode);
     } else {
         sampleSource.connect(gainNode);
     }
