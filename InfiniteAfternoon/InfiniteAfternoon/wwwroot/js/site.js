@@ -4,8 +4,11 @@ var startTime;
 const deltaTimeWarp = 25000; // fast forward 25 s so no big silence at the start
 //const minSineInterval = 3000; // test
 //const maxSineInterval = 20000; // test
-const minSineInterval = 17500;
-const maxSineInterval = 44000;
+const minSineInterval = 16500;
+const maxSineInterval = 45000;
+
+const minPianoInterval = 22500;
+const maxPianoInterval = 125000;
 
 //const minSubInterval = 1000; // test
 //const maxSubInterval = 6000; // test
@@ -18,6 +21,7 @@ const minFXInterval = 45000;
 const maxFXInterval = 900000; // 15 minutes
 
 let randomSineIntervals = [];
+let randomPianoIntervals = [];
 let randomFxIntervals = [];
 
 let isPlaying = false;
@@ -33,16 +37,25 @@ let nowPlayingIntervals = [];
 
 const samplePathLoops = ['/audio/loop-drone.mp3'];
 const samplePathsSines = ['/audio/sine-b4.mp3', '/audio/sine-d4.mp3', '/audio/sine-e4.mp3', '/audio/sine-f4.mp3', '/audio/sine-gsharp4.mp3', '/audio/sine-d5.mp3'];
+const samplePathsPiano = ['/audio/piano-a2.mp3', '/audio/piano-b2.mp3', '/audio/piano-d2.mp3', '/audio/piano-e2.mp3', '/audio/piano-gsharp2.mp3'];
 const samplePathsSubs = ['/audio/sub-e0.mp3', '/audio/sub-e0-2.mp3'];
-const samplePathsFX = ['/audio/fx-birdlike.mp3', '/audio/fx-triangle.mp3', '/audio/fx-pizzi1.mp3', '/audio/fx-pizzi2.mp3', '/audio/fx-pizzi3.mp3', '/audio/fx-pizzi4.mp3', '/audio/fx-pizzi5.mp3'];
+const samplePathsFX = ['/audio/fx-birdlike.mp3', '/audio/fx-pizzi1.mp3', '/audio/fx-pizzi2.mp3', '/audio/fx-pizzi3.mp3', '/audio/fx-pizzi4.mp3', '/audio/fx-pizzi5.mp3'];
 
 let sineDropYPositions = [];
 sineDropYPositions.push({ name:'d5', yval: '10%' });
 sineDropYPositions.push({ name: 'b4', yval: '25%' });
 sineDropYPositions.push({ name: 'gsharp4', yval:'35%' });
-sineDropYPositions.push({ name: 'f4', yval: '55%' });
-sineDropYPositions.push({ name: 'e4', yval: '65%' });
-sineDropYPositions.push({ name: 'd4', yval: '85%' });
+sineDropYPositions.push({ name: 'f4', yval: '45%' });
+sineDropYPositions.push({ name: 'e4', yval: '55%' });
+sineDropYPositions.push({ name: 'd4', yval: '65%' });
+
+let pianoDropYPositions = [];
+pianoDropYPositions.push({ name: 'pb2', yval: '80%' });
+pianoDropYPositions.push({ name: 'pa2', yval: '83%' });
+pianoDropYPositions.push({ name: 'pgsharp2', yval: '85%' });
+pianoDropYPositions.push({ name: 'pd2', yval: '90%' });
+pianoDropYPositions.push({ name: 'pe2', yval: '95%' });
+pianoDropYPositions.push({ name: 'pf2', yval: '98%' });
 
 $('#volumecontrol').on('input', function () {
     var volval = parseInt($(this).val()) / 100;
@@ -117,6 +130,7 @@ $('#start').on('click', function () {
         gainNode.gain.exponentialRampToValueAtTime(1, audioContext.currentTime + 2);
     });
 
+    // Sines
     setupSamples(samplePathsSines).then((response) => {
         samples = response;
 
@@ -131,7 +145,32 @@ $('#start').on('click', function () {
 
                     randomPan += 1; //get off negative, range 0 - 2
                     randomPan *= 50; // range 0 - 100
-                    showDrop(samplePathsSines[i], randomPan);
+                    showDrop(samplePathsSines[i], randomPan, 'sine');
+                }, interval, true)
+
+                nowPlayingIntervals.push(sampleInterval);
+            })(i, interval);
+
+            console.log('initing note ' + i + ' on interval ' + interval);
+        }
+    });
+
+    // Piano
+    setupSamples(samplePathsPiano).then((response) => {
+        samples = response;
+
+        for (var i = 0; i < response.length; i++) {
+            let interval = randomIntFromInterval(minPianoInterval, maxPianoInterval, 'piano');
+
+            (function (i, interval) {
+                let sampleInterval = customInterval(function () {
+                    var randomPan = (Math.ceil(Math.random() * 99) * (Math.round(Math.random()) ? 1 : -1)) / 100;
+
+                    playSample(response[i], 0, false, randomPan);
+
+                    randomPan += 1; //get off negative, range 0 - 2
+                    randomPan *= 50; // range 0 - 100
+                    showDrop(samplePathsPiano[i], randomPan, 'piano');
                 }, interval, true)
 
                 nowPlayingIntervals.push(sampleInterval);
@@ -245,7 +284,7 @@ function randomIntFromInterval(min, max, type, isDeep) {
     if (type == 'sine') {
         // check if note is not too close to others
         for (let i = 0; i < randomSineIntervals.length; i++) {
-            if (Math.abs(randomSineIntervals[i] - randomNumber) < 2000) {
+            if (Math.abs(randomSineIntervals[i] - randomNumber) < 500) {
                 console.log('rechoosing random... diff was ' + Math.abs(randomSineIntervals[i] - randomNumber));
                 randomNumber = randomIntFromInterval(min, max, type, true);
             }
@@ -253,6 +292,18 @@ function randomIntFromInterval(min, max, type, isDeep) {
 
         if (!isDeep)
             randomSineIntervals.push(randomNumber);
+    }
+    else if (type == 'piano') {
+        // check if note is not too close to others
+        for (let i = 0; i < randomPianoIntervals.length; i++) {
+            if (Math.abs(randomPianoIntervals[i] - randomNumber) < 8000) {
+                console.log('rechoosing random... diff was ' + Math.abs(randomPianoIntervals[i] - randomNumber));
+                randomNumber = randomIntFromInterval(min, max, type, true);
+            }
+        }
+
+        if (!isDeep)
+            randomPianoIntervals.push(randomNumber);
     }
     else if (type == 'fx') {
         // want fx at least 10 seconds apart initially
@@ -295,21 +346,39 @@ function playSample(audioBuffer, time, loop, panVal) {
     return sampleSource;
 }
 
-function showDrop(sampleName, xValue) {
-    var yValue = '50%';
-    sampleName = sampleName.replace('/audio/sine-', '').replace('.mp3', '');
+function showDrop(sampleName, xValue, type) {
 
-    for (var i = 0; i < sineDropYPositions.length; i++) {
-        if (sineDropYPositions[i].name == sampleName) {
-            yValue = sineDropYPositions[i].yval;
+    if (type == 'piano') {
+        var yValue = '50%';
+        sampleName = sampleName.replace('/audio/piano-', 'p').replace('.mp3', '');
+
+        for (var i = 0; i < pianoDropYPositions.length; i++) {
+            if (pianoDropYPositions[i].name == sampleName) {
+                yValue = pianoDropYPositions[i].yval;
+            }
         }
+
+        $('.dropscanvas').append('<div data-sample="' + sampleName + '" class="drop piano" style="top: ' + yValue + '; left: ' + xValue + '%"></div>');
+
+        setTimeout(function () {
+            $('.drop[data-sample="' + sampleName + '"]').remove();
+        }, 5500);
+    } else {
+        var yValue = '50%';
+        sampleName = sampleName.replace('/audio/sine-', '').replace('.mp3', '');
+
+        for (var i = 0; i < sineDropYPositions.length; i++) {
+            if (sineDropYPositions[i].name == sampleName) {
+                yValue = sineDropYPositions[i].yval;
+            }
+        }
+
+        $('.dropscanvas').append('<div data-sample="' + sampleName + '" class="drop" style="top: ' + yValue + '; left: ' + xValue + '%"></div>');
+
+        setTimeout(function () {
+            $('.drop[data-sample="' + sampleName + '"]').remove();
+        }, 5500);
     }
-
-    $('.dropscanvas').append('<div data-sample="' + sampleName + '" class="drop" style="top: ' + yValue + '; left: ' + xValue + '%"></div>');
-
-    setTimeout(function () {
-        $('.drop[data-sample="' + sampleName + '"]').remove();
-    }, 5500);
 }
 
 $('.openinfo').on('click', function () {
