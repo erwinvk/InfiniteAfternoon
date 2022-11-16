@@ -35,7 +35,7 @@ let samples;
 let nowPlaying = [];
 let nowPlayingIntervals = [];
 
-const samplePathLoops = ['/audio/loop-drone.mp3'];
+const samplePathLoops = ['/audio/drone-loop.mp3'];
 const samplePathsSines = ['/audio/sine-b4.mp3', '/audio/sine-d4.mp3', '/audio/sine-e4.mp3', '/audio/sine-f4.mp3', '/audio/sine-gsharp4.mp3', '/audio/sine-d5.mp3'];
 const samplePathsPiano = ['/audio/piano-a2.mp3', '/audio/piano-b2.mp3', '/audio/piano-d2.mp3', '/audio/piano-e2.mp3', '/audio/piano-gsharp2.mp3'];
 const samplePathsSubs = ['/audio/sub-e0.mp3', '/audio/sub-e0-2.mp3'];
