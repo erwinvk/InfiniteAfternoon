@@ -437,6 +437,46 @@ button {
             animation-iteration-count: 1;
         }
     }
+
+    .note {
+        position: absolute;
+        left: 0;
+        width: 100%;
+        height: 20%;
+        background: linear-gradient(#5168A700 10%, #5168A722 50%, #5168A700 90%);
+        animation-name: note;
+        animation-duration: 20s;
+        animation-iteration-count: 1;
+        transition: all 1s ease-in-out;
+    }
+}
+
+@keyframes note {
+    0% {
+        //opacity: 0;
+        transform: scale(1);
+        opacity: 0;
+    }
+
+    20% {
+        transform: scale(1.1);
+        opacity: .8;
+    }
+
+    78% {
+        transform: scale(1.4);
+        opacity: .5;
+    }
+
+    85% {
+        transform: scale(.9);
+        opacity: 0;
+    }
+
+    100% {
+        transform: scale(1);
+        opacity: 0;
+    }
 }
 
 @keyframes ripple {

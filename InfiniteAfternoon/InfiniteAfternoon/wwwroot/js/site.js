@@ -5,7 +5,7 @@ const deltaTimeWarp = 25000; // fast forward 25 s so no big silence at the start
 //const minSineInterval = 3000; // test
 //const maxSineInterval = 20000; // test
 const minSineInterval = 16500;
-const maxSineInterval = 45000;
+const maxSineInterval = 65000;
 
 const minPianoInterval = 22500;
 const maxPianoInterval = 125000;
@@ -35,11 +35,19 @@ let samples;
 let nowPlaying = [];
 let nowPlayingIntervals = [];
 
-const samplePathLoops = ['/audio/drone-loop.mp3'];
+const samplePathLoops = ['/audio/drone-loop-e2.mp3', '/audio/drone-loop-b2.mp3', '/audio/drone-loop-a2.mp3', '/audio/drone-loop-f2.mp3', '/audio/drone-loop-gsharp2.mp3', '/audio/drone-loop-d3.mp3'];
 const samplePathsSines = ['/audio/sine-b4.mp3', '/audio/sine-d4.mp3', '/audio/sine-e4.mp3', '/audio/sine-f4.mp3', '/audio/sine-gsharp4.mp3', '/audio/sine-d5.mp3'];
 const samplePathsPiano = ['/audio/piano-a2.mp3', '/audio/piano-b2.mp3', '/audio/piano-d2.mp3', '/audio/piano-e2.mp3', '/audio/piano-gsharp2.mp3'];
 const samplePathsSubs = ['/audio/sub-e0.mp3', '/audio/sub-e0-2.mp3'];
 const samplePathsFX = ['/audio/fx-birdlike.mp3', '/audio/fx-pizzi1.mp3', '/audio/fx-pizzi2.mp3', '/audio/fx-pizzi3.mp3', '/audio/fx-pizzi4.mp3', '/audio/fx-pizzi5.mp3'];
+
+let loopYPositions = [];
+loopYPositions.push({ name: 'd3', yval: '15%' });
+loopYPositions.push({ name: 'b2', yval: '25%' });
+loopYPositions.push({ name: 'a2', yval: '40%' });
+loopYPositions.push({ name: 'gsharp2', yval: '55%' });
+loopYPositions.push({ name: 'f2', yval: '70%' });
+loopYPositions.push({ name: 'e2', yval: '85%' });
 
 let sineDropYPositions = [];
 sineDropYPositions.push({ name:'d5', yval: '10%' });
@@ -119,11 +127,20 @@ $('#start').on('click', function () {
     // Loads and play loops
     setupSamples(samplePathLoops).then((response) => {
         samples = response;
+        var interval = 18000;
 
         for (var i = 0; i < samples.length; i++) {
-            console.log('initing loop ' + i);
-            playSample(samples[i], 0, true);
+            (function (i, interval) {
+                let sampleInterval = customInterval(function () {
+                    playSample(response[i], 0, false);
+                    showBaseNote(samplePathLoops[i]);
+                }, interval, true, 17500);
+                nowPlayingIntervals.push(sampleInterval);
+            })(i, interval);
+            interval += 8700;
         }
+
+        console.log('initing loop ' + i);
 
         //fade them in
         gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime);
@@ -235,14 +252,19 @@ $('#stop').on('click', function () {
     }, 4000);
 });
 
-function customInterval(callback, interval, isFirst) {
+function customInterval(callback, interval, isFirst, customDelta) {
     // fast forward first loop... 
+    let thisDeltaTimewarp = deltaTimeWarp;
+
+    if (customDelta)
+        thisDeltaTimewarp = customDelta;
+
     let tempInterval = interval;
     if (isFirst) {
-        tempInterval -= deltaTimeWarp;
+        tempInterval -= thisDeltaTimewarp;
         // if the interval is now before our start, do original interval, minus the difference
         if (tempInterval < 0) {
-            let delta = interval - deltaTimeWarp;
+            let delta = interval - thisDeltaTimewarp;
             tempInterval = (interval  - Math.abs(delta));
         }
 
@@ -346,8 +368,24 @@ function playSample(audioBuffer, time, loop, panVal) {
     return sampleSource;
 }
 
-function showDrop(sampleName, xValue, type) {
+function showBaseNote(sampleName) {
+    var yValue = '50';
+    var sampleName = sampleName.replace('/audio/drone-loop-', '').replace('.mp3', '');
 
+    for (var i = 0; i < loopYPositions.length; i++) {
+        if (loopYPositions[i].name == sampleName) {
+            yValue = loopYPositions[i].yval;
+        }
+    }
+
+    $('.dropscanvas').append('<div data-sample="' + sampleName + '" class="note" style="top: ' + yValue + '"></div>');
+
+    setTimeout(function () {
+        $('.note[data-sample="' + sampleName + '"]').remove();
+    }, 17000);
+}
+
+function showDrop(sampleName, xValue, type) {
     if (type == 'piano') {
         var yValue = '50%';
         sampleName = sampleName.replace('/audio/piano-', 'p').replace('.mp3', '');
