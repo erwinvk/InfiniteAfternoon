@@ -127,14 +127,14 @@ $('#start').on('click', function () {
     // Loads and play loops
     setupSamples(samplePathLoops).then((response) => {
         samples = response;
-        var interval = 18000;
+        var interval = 14000;
 
         for (var i = 0; i < samples.length; i++) {
             (function (i, interval) {
                 let sampleInterval = customInterval(function () {
                     playSample(response[i], 0, false);
                     showBaseNote(samplePathLoops[i]);
-                }, interval, true, 17500);
+                }, interval, true, 13500);
                 nowPlayingIntervals.push(sampleInterval);
             })(i, interval);
             interval += 7700;
@@ -382,7 +382,7 @@ function showBaseNote(sampleName) {
 
     setTimeout(function () {
         $('.note[data-sample="' + sampleName + '"]').remove();
-    }, 17000);
+    }, 14000);
 }
 
 function showDrop(sampleName, xValue, type) {
