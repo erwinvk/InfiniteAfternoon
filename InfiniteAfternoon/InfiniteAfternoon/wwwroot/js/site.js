@@ -137,7 +137,7 @@ $('#start').on('click', function () {
                 }, interval, true, 17500);
                 nowPlayingIntervals.push(sampleInterval);
             })(i, interval);
-            interval += 8700;
+            interval += 7700;
         }
 
         console.log('initing loop ' + i);
@@ -400,7 +400,7 @@ function showDrop(sampleName, xValue, type) {
 
         setTimeout(function () {
             $('.drop[data-sample="' + sampleName + '"]').remove();
-        }, 5500);
+        }, 15200);
     } else {
         var yValue = '50%';
         sampleName = sampleName.replace('/audio/sine-', '').replace('.mp3', '');
@@ -415,7 +415,7 @@ function showDrop(sampleName, xValue, type) {
 
         setTimeout(function () {
             $('.drop[data-sample="' + sampleName + '"]').remove();
-        }, 5500);
+        }, 15200);
     }
 }
 
