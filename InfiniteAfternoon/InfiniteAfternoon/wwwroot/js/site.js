@@ -30,10 +30,11 @@ let analyser;
 let gainNode;
 let masterVolumeGainNode;
 let masterDelayGainNode;
+let masterDelayFeedbackNode;
 let masterDelayNode;
-let samples;
 let nowPlaying = [];
-let nowPlayingIntervals = [];
+let pendingTimeouts = new Set();
+const bufferCache = new Map();
 
 const samplePathLoops = ['/audio/drone-loop-e2.mp3', '/audio/drone-loop-b2.mp3', '/audio/drone-loop-a2.mp3', '/audio/drone-loop-f2.mp3', '/audio/drone-loop-gsharp2.mp3', '/audio/drone-loop-d3.mp3'];
 const samplePathsSines = ['/audio/sine-b4.mp3', '/audio/sine-d4.mp3', '/audio/sine-e4.mp3', '/audio/sine-f4.mp3', '/audio/sine-gsharp4.mp3', '/audio/sine-d5.mp3'];
@@ -76,9 +77,10 @@ $('#start').on('click', function () {
         gainNode.gain.exponentialRampToValueAtTime(1, audioContext.currentTime);
         gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 2);
 
-        for (let i = 0; i < nowPlayingIntervals.length; i++) {
-            clearInterval(nowPlayingIntervals[i]);
+        for (const pendingTimeout of pendingTimeouts) {
+            clearTimeout(pendingTimeout);
         }
+        pendingTimeouts.clear();
         console.log('Intervals cleared');
 
         setTimeout(function () {
@@ -86,9 +88,7 @@ $('#start').on('click', function () {
                 nowPlaying[i].stop()
             }
 
-            // clear these
             nowPlaying = [];
-            nowPlayingIntervals = [];
         }, 2000);
         $(this).removeClass('pause')
         console.log('samples stopped');
@@ -96,46 +96,50 @@ $('#start').on('click', function () {
         return false;
     }
 
-    audioContext = new AudioContext();
-    masterVolumeGainNode = audioContext.createGain();
-    masterVolumeGainNode.connect(audioContext.destination);
+    // build the audio graph once; on resume we reuse the context and cached buffers
+    if (!audioContext) {
+        audioContext = new AudioContext();
+        masterVolumeGainNode = audioContext.createGain();
+        masterVolumeGainNode.connect(audioContext.destination);
+        masterVolumeGainNode.gain.value = parseInt($('#volumecontrol').val()) / 100;
 
-    gainNode = audioContext.createGain();
-    gainNode.connect(masterVolumeGainNode);
+        gainNode = audioContext.createGain();
+        gainNode.connect(masterVolumeGainNode);
 
-    masterDelayFeedbackNode = audioContext.createGain();
-    //masterDelayGainNode.connect(gainNode);
-    masterDelayFeedbackNode.gain.value = 0.3;
+        masterDelayFeedbackNode = audioContext.createGain();
+        masterDelayFeedbackNode.gain.value = 0.3;
 
-    var biquadFilter = audioContext.createBiquadFilter();
-    biquadFilter.type = biquadFilter.LOWPASS;
-    biquadFilter.frequency.value = 600;
-    //biquadFilter.Q.value = 20;
+        var biquadFilter = audioContext.createBiquadFilter();
+        biquadFilter.type = 'lowpass';
+        biquadFilter.frequency.value = 600;
+        //biquadFilter.Q.value = 20;
 
-    masterDelayNode = audioContext.createDelay(3);
-    masterDelayNode.delayTime.value = 1.4;
-    masterDelayNode.connect(biquadFilter);
-    biquadFilter.connect(masterDelayFeedbackNode);
-    //masterDelayNode.connect(gainNode);
-    masterDelayFeedbackNode.connect(masterDelayNode);
-    masterDelayFeedbackNode.connect(gainNode);
+        masterDelayNode = audioContext.createDelay(3);
+        masterDelayNode.delayTime.value = 1.4;
+        masterDelayNode.connect(biquadFilter);
+        biquadFilter.connect(masterDelayFeedbackNode);
+        masterDelayFeedbackNode.connect(masterDelayNode);
+        masterDelayFeedbackNode.connect(gainNode);
 
-    console.log('audiocontext started...');
+        console.log('audiocontext started...');
+    }
+
+    randomSineIntervals = [];
+    randomPianoIntervals = [];
+    randomFxIntervals = [];
 
     $(this).addClass('pause');
 
     // Loads and play loops
     setupSamples(samplePathLoops).then((response) => {
-        samples = response;
         var interval = 14000;
 
-        for (var i = 0; i < samples.length; i++) {
+        for (var i = 0; i < response.length; i++) {
             (function (i, interval) {
-                let sampleInterval = customInterval(function () {
+                customInterval(function () {
                     playSample(response[i], 0, false);
                     showBaseNote(samplePathLoops[i]);
                 }, interval, true, 13500);
-                nowPlayingIntervals.push(sampleInterval);
             })(i, interval);
             interval += 7700;
         }
@@ -149,13 +153,11 @@ $('#start').on('click', function () {
 
     // Sines
     setupSamples(samplePathsSines).then((response) => {
-        samples = response;
-
         for (var i = 0; i < response.length; i++) {
             let interval = randomIntFromInterval(minSineInterval, maxSineInterval, 'sine');
 
             (function (i, interval) {
-                let sampleInterval = customInterval(function () {
+                customInterval(function () {
                     var randomPan = (Math.ceil(Math.random() * 99) * (Math.round(Math.random()) ? 1 : -1)) / 100;
 
                     playSample(response[i], 0, false, randomPan);
@@ -164,8 +166,6 @@ $('#start').on('click', function () {
                     randomPan *= 50; // range 0 - 100
                     showDrop(samplePathsSines[i], randomPan, 'sine');
                 }, interval, true)
-
-                nowPlayingIntervals.push(sampleInterval);
             })(i, interval);
 
             console.log('initing note ' + i + ' on interval ' + interval);
@@ -174,13 +174,11 @@ $('#start').on('click', function () {
 
     // Piano
     setupSamples(samplePathsPiano).then((response) => {
-        samples = response;
-
         for (var i = 0; i < response.length; i++) {
             let interval = randomIntFromInterval(minPianoInterval, maxPianoInterval, 'piano');
 
             (function (i, interval) {
-                let sampleInterval = customInterval(function () {
+                customInterval(function () {
                     var randomPan = (Math.ceil(Math.random() * 99) * (Math.round(Math.random()) ? 1 : -1)) / 100;
 
                     playSample(response[i], 0, false, randomPan);
@@ -189,8 +187,6 @@ $('#start').on('click', function () {
                     randomPan *= 50; // range 0 - 100
                     showDrop(samplePathsPiano[i], randomPan, 'piano');
                 }, interval, true)
-
-                nowPlayingIntervals.push(sampleInterval);
             })(i, interval);
 
             console.log('initing note ' + i + ' on interval ' + interval);
@@ -199,36 +195,27 @@ $('#start').on('click', function () {
 
     // subs. Don't want these possibly looping over another, so pick a random interval and at that interval play one of the subs.
     setupSamples(samplePathsSubs).then((response) => {
-        samples = response;
         let interval = randomIntFromInterval(minSubInterval, maxSubInterval, 'sub');
 
-        (function (interval) {
-            let sampleInterval = customInterval(function () {
-                //pick a random sub sample
-                var randomSampleNumber = Math.floor(Math.random() * response.length);
+        customInterval(function () {
+            //pick a random sub sample
+            var randomSampleNumber = Math.floor(Math.random() * response.length);
 
-                playSample(response[randomSampleNumber], 0, false);
-            }, interval)
-
-            nowPlayingIntervals.push(sampleInterval);
-        })(interval);
+            playSample(response[randomSampleNumber], 0, false);
+        }, interval);
     });
 
     // FX
     setupSamples(samplePathsFX).then((response) => {
-        samples = response;
-
         for (var i = 0; i < response.length; i++) {
             let interval = randomIntFromInterval(minFXInterval, maxFXInterval, 'fx');
 
             (function(i, interval) {
-                let sampleInterval = customInterval(function () {
+                customInterval(function () {
                     var randomPan = (Math.ceil(Math.random() * 99) * (Math.round(Math.random()) ? 1 : -1)) / 100;
                     playSample(response[i], 0, false, randomPan);
                     console.log('now playing FX ' + interval);
                 }, interval, true)
-
-                nowPlayingIntervals.push(sampleInterval);
             })(i, interval);
 
             console.log('initing note ' + i + ' on interval ' + interval);
@@ -272,32 +259,33 @@ function customInterval(callback, interval, isFirst, customDelta) {
     }
     
     var timeout = setTimeout(function () {
+        pendingTimeouts.delete(timeout);
         if (isPlaying) {
             callback();
             customInterval(callback, interval, false);
         }
     }, Math.abs(tempInterval));
+
+    pendingTimeouts.add(timeout);
 }
 
 async function getFile(path) {
+    // decoded buffers are cached, so pause/resume does not re-download or re-decode
+    if (bufferCache.has(path)) {
+        return bufferCache.get(path);
+    }
+
     const response = await fetch(path);
     const arrayBuffer = await response.arrayBuffer();
     const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
     console.log('loaded file: ' + path);
+    bufferCache.set(path, audioBuffer);
     return audioBuffer;
 }
 
-async function setupSamples(paths) {
-    console.log('loading audio...')
-    const audioBuffers = [];
-
-    for (const path of paths) {
-        const sample = await getFile(path);
-        audioBuffers.push(sample);
-    }
-
-    console.log('loaded audio')
-    return audioBuffers;
+function setupSamples(paths) {
+    // load all samples of a group in parallel
+    return Promise.all(paths.map(getFile));
 }
 
 function randomIntFromInterval(min, max, type, isDeep) {

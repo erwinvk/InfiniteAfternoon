@@ -3,6 +3,11 @@ var builder = WebApplication.CreateBuilder(args);
 // Add services to the container.
 builder.Services.AddRazorPages();
 
+builder.Services.AddResponseCompression(options =>
+{
+    options.EnableForHttps = true;
+});
+
 var mvcBuilder = builder.Services.AddControllersWithViews();
 
 #if DEBUG
@@ -20,7 +25,15 @@ if (!app.Environment.IsDevelopment())
 }
 
 app.UseHttpsRedirection();
-app.UseStaticFiles();
+app.UseResponseCompression();
+app.UseStaticFiles(new StaticFileOptions
+{
+    OnPrepareResponse = ctx =>
+    {
+        // css/js links use asp-append-version, audio/fonts rarely change
+        ctx.Context.Response.Headers.CacheControl = "public,max-age=604800";
+    }
+});
 
 app.UseRouting();
 
