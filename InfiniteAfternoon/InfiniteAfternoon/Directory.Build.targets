@@ -1,0 +1,18 @@
+<Project>
+
+  <!--
+    DartSassBuilder 1.1.0 ships a build tool that targets .NET 8. On machines with only
+    a newer runtime installed, the tool fails to launch. This overrides the package's
+    DartSass_Build target (Directory.Build.targets imports after NuGet package targets)
+    to pass the roll-forward (LatestMajor) runtime option so the tool runs on the installed runtime.
+    Remove once DartSassBuilder ships a version targeting a current runtime.
+  -->
+  <Target Name="DartSass_Build"
+          DependsOnTargets="DartSass_BuildArgsFromFileList"
+          BeforeTargets="BeforeBuild"
+          Condition="'$(DartSassBuilderArgs)' != ''">
+    <Message Text="Invoking sass preprocessor (with roll-forward)..." Importance="$(DartSassMessageLevel)" />
+    <Exec Command="dotnet --roll-forward LatestMajor &quot;$(SassExe)&quot; $(DartSassBuilderArgs)" />
+  </Target>
+
+</Project>
