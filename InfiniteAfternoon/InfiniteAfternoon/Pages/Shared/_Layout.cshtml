@@ -1,8 +1,11 @@
-﻿<html>
+﻿<!DOCTYPE html>
+<html lang="en">
 <head>
-    <title>Infinite Afternoon</title>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Infinite Afternoon — endless generative ambient music</title>
 
-    <meta name="description" />
+    <meta name="description" content="Infinite Afternoon plays endless, ever-changing generative ambient music in your browser. Every note lands at a random moment, so no two listens are ever the same. Inspired by Brian Eno's Thursday Afternoon." />
     <meta name="robots" content="index, follow" />
     <meta name="googlebot" content="index, follow, max-snippet:-1, max-image-preview:large, max-video-preview:-1" />
     <meta name="bingbot" content="index, follow, max-snippet:-1, max-image-preview:large, max-video-preview:-1" />
@@ -15,6 +18,21 @@
     <meta property="og:url" content="https://infiniteafternoon.com/" />
     <meta property="og:site_name" content="Infinite Afternoon" />
     @*<meta name="twitter:card" content="summary_large_image" />*@
+
+    <script type="application/ld+json">
+    {
+      "@@context": "https://schema.org",
+      "@@type": "WebApplication",
+      "name": "Infinite Afternoon",
+      "url": "https://infiniteafternoon.com/",
+      "description": "Endless, ever-changing generative ambient music in your browser, inspired by Brian Eno's Thursday Afternoon.",
+      "applicationCategory": "MultimediaApplication",
+      "genre": "Ambient music",
+      "browserRequirements": "Requires JavaScript",
+      "offers": { "@@type": "Offer", "price": "0", "priceCurrency": "EUR" },
+      "author": { "@@type": "Person", "name": "Erwin van Kester", "url": "https://erwinvankester.nl" }
+    }
+    </script>
 
     <link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap.min.css" />
     <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />

@@ -372,6 +372,17 @@ button {
     visibility: visible;
     transition: opacity .7s ease-in-out;
 
+    // .themiddle (this panel's positioning parent) is exactly viewport-centered,
+    // its padding box is 240x240, so offsets from 120px land on the viewport center
+    @media (max-width: 600px) {
+        top: calc(-40vh + 120px);
+        left: calc(120px - 45vw);
+        width: 90vw;
+        max-height: 80vh;
+        overflow-y: auto;
+        box-sizing: border-box;
+    }
+
     &.hidden {
         visibility:hidden;
         opacity: 0;
