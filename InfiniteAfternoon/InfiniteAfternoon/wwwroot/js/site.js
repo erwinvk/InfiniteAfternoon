@@ -32,9 +32,34 @@ let masterVolumeGainNode;
 let masterDelayGainNode;
 let masterDelayFeedbackNode;
 let masterDelayNode;
+let sleepGainNode;
 let nowPlaying = [];
 let pendingTimeouts = new Set();
 const bufferCache = new Map();
+
+// every afternoon has a seed; the same seed in the url replays the same schedule
+const seed = (function () {
+    const param = new URLSearchParams(window.location.search).get('afternoon');
+    if (param) {
+        const parsed = parseInt(param, 36);
+        if (!isNaN(parsed)) return parsed >>> 0;
+    }
+    return (Math.random() * 4294967296) >>> 0;
+})();
+let intervalRng;
+
+function mulberry32(a) {
+    return function () {
+        a |= 0; a = a + 0x6D2B79F5 | 0;
+        let t = Math.imul(a ^ a >>> 15, 1 | a);
+        t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+        return ((t ^ t >>> 14) >>> 0) / 4294967296;
+    }
+}
+
+function randomPanValue(rng) {
+    return (Math.ceil(rng() * 99) * (rng() < 0.5 ? 1 : -1)) / 100;
+}
 
 const samplePathLoops = ['/audio/drone-loop-e2.mp3', '/audio/drone-loop-b2.mp3', '/audio/drone-loop-a2.mp3', '/audio/drone-loop-f2.mp3', '/audio/drone-loop-gsharp2.mp3', '/audio/drone-loop-d3.mp3'];
 const samplePathsSines = ['/audio/sine-b4.mp3', '/audio/sine-d4.mp3', '/audio/sine-e4.mp3', '/audio/sine-f4.mp3', '/audio/sine-gsharp4.mp3', '/audio/sine-d5.mp3'];
@@ -93,6 +118,9 @@ $('#start').on('click', function () {
         $(this).removeClass('pause')
         console.log('samples stopped');
         isPlaying = false;
+        clearSleepTimer(true);
+        stopEnergyAnimation();
+        updateMediaSession(false);
         return false;
     }
 
@@ -100,8 +128,18 @@ $('#start').on('click', function () {
     if (!audioContext) {
         audioContext = new AudioContext();
         masterVolumeGainNode = audioContext.createGain();
-        masterVolumeGainNode.connect(audioContext.destination);
         masterVolumeGainNode.gain.value = parseInt($('#volumecontrol').val()) / 100;
+
+        // sleep timer fades this separate node, so the volume slider stays untouched
+        sleepGainNode = audioContext.createGain();
+        masterVolumeGainNode.connect(sleepGainNode);
+        sleepGainNode.connect(audioContext.destination);
+
+        // tap for the audio-reactive visuals
+        analyser = audioContext.createAnalyser();
+        analyser.fftSize = 256;
+        analyser.smoothingTimeConstant = 0.85;
+        sleepGainNode.connect(analyser);
 
         gainNode = audioContext.createGain();
         gainNode.connect(masterVolumeGainNode);
@@ -127,6 +165,16 @@ $('#start').on('click', function () {
     randomSineIntervals = [];
     randomPianoIntervals = [];
     randomFxIntervals = [];
+
+    // draw the whole schedule up front from the seeded rng, so the same seed
+    // always produces the same afternoon regardless of sample load order
+    intervalRng = mulberry32(seed);
+    history.replaceState(null, '', '?afternoon=' + seed.toString(36));
+
+    const sineIntervals = samplePathsSines.map(function () { return randomIntFromInterval(minSineInterval, maxSineInterval, 'sine'); });
+    const pianoIntervals = samplePathsPiano.map(function () { return randomIntFromInterval(minPianoInterval, maxPianoInterval, 'piano'); });
+    const subInterval = randomIntFromInterval(minSubInterval, maxSubInterval, 'sub');
+    const fxIntervals = samplePathsFX.map(function () { return randomIntFromInterval(minFXInterval, maxFXInterval, 'fx'); });
 
     $(this).addClass('pause');
 
@@ -154,79 +202,201 @@ $('#start').on('click', function () {
     // Sines
     setupSamples(samplePathsSines).then((response) => {
         for (var i = 0; i < response.length; i++) {
-            let interval = randomIntFromInterval(minSineInterval, maxSineInterval, 'sine');
-
-            (function (i, interval) {
+            (function (i) {
+                const noteRng = mulberry32(seed + 1000 + i);
                 customInterval(function () {
-                    var randomPan = (Math.ceil(Math.random() * 99) * (Math.round(Math.random()) ? 1 : -1)) / 100;
-
+                    var randomPan = randomPanValue(noteRng);
                     playSample(response[i], 0, false, randomPan);
+                    showDrop(samplePathsSines[i], (randomPan + 1) * 50, 'sine');
+                }, sineIntervals[i], true)
+            })(i);
 
-                    randomPan += 1; //get off negative, range 0 - 2
-                    randomPan *= 50; // range 0 - 100
-                    showDrop(samplePathsSines[i], randomPan, 'sine');
-                }, interval, true)
-            })(i, interval);
-
-            console.log('initing note ' + i + ' on interval ' + interval);
+            console.log('initing note ' + i + ' on interval ' + sineIntervals[i]);
         }
     });
 
     // Piano
     setupSamples(samplePathsPiano).then((response) => {
         for (var i = 0; i < response.length; i++) {
-            let interval = randomIntFromInterval(minPianoInterval, maxPianoInterval, 'piano');
-
-            (function (i, interval) {
+            (function (i) {
+                const noteRng = mulberry32(seed + 2000 + i);
                 customInterval(function () {
-                    var randomPan = (Math.ceil(Math.random() * 99) * (Math.round(Math.random()) ? 1 : -1)) / 100;
-
+                    var randomPan = randomPanValue(noteRng);
                     playSample(response[i], 0, false, randomPan);
+                    showDrop(samplePathsPiano[i], (randomPan + 1) * 50, 'piano');
+                }, pianoIntervals[i], true)
+            })(i);
 
-                    randomPan += 1; //get off negative, range 0 - 2
-                    randomPan *= 50; // range 0 - 100
-                    showDrop(samplePathsPiano[i], randomPan, 'piano');
-                }, interval, true)
-            })(i, interval);
-
-            console.log('initing note ' + i + ' on interval ' + interval);
+            console.log('initing note ' + i + ' on interval ' + pianoIntervals[i]);
         }
     });
 
     // subs. Don't want these possibly looping over another, so pick a random interval and at that interval play one of the subs.
     setupSamples(samplePathsSubs).then((response) => {
-        let interval = randomIntFromInterval(minSubInterval, maxSubInterval, 'sub');
+        const subRng = mulberry32(seed + 3000);
 
         customInterval(function () {
             //pick a random sub sample
-            var randomSampleNumber = Math.floor(Math.random() * response.length);
+            var randomSampleNumber = Math.floor(subRng() * response.length);
 
             playSample(response[randomSampleNumber], 0, false);
-        }, interval);
+        }, subInterval);
     });
 
     // FX
     setupSamples(samplePathsFX).then((response) => {
         for (var i = 0; i < response.length; i++) {
-            let interval = randomIntFromInterval(minFXInterval, maxFXInterval, 'fx');
-
-            (function(i, interval) {
+            (function (i) {
+                const noteRng = mulberry32(seed + 4000 + i);
                 customInterval(function () {
-                    var randomPan = (Math.ceil(Math.random() * 99) * (Math.round(Math.random()) ? 1 : -1)) / 100;
+                    var randomPan = randomPanValue(noteRng);
                     playSample(response[i], 0, false, randomPan);
-                    console.log('now playing FX ' + interval);
-                }, interval, true)
-            })(i, interval);
+                    console.log('now playing FX ' + fxIntervals[i]);
+                }, fxIntervals[i], true)
+            })(i);
 
-            console.log('initing note ' + i + ' on interval ' + interval);
+            console.log('initing note ' + i + ' on interval ' + fxIntervals[i]);
         }
     });
 
     // set start time
     isPlaying = true;
     startTime = new Date();
+    updateMediaSession(true);
+    startEnergyAnimation();
     displayTimeElapsed();
 });
+
+function updateMediaSession(playing) {
+    if (!('mediaSession' in navigator)) return;
+
+    if (!navigator.mediaSession.metadata) {
+        navigator.mediaSession.metadata = new MediaMetadata({
+            title: 'Infinite Afternoon',
+            artist: 'Erwin van Kester',
+            album: 'infiniteafternoon.com',
+            artwork: [
+                { src: '/img/icon-192.png', sizes: '192x192', type: 'image/png' },
+                { src: '/img/icon-512.png', sizes: '512x512', type: 'image/png' }
+            ]
+        });
+        navigator.mediaSession.setActionHandler('play', function () { if (!isPlaying) $('#start').trigger('click'); });
+        navigator.mediaSession.setActionHandler('pause', function () { if (isPlaying) $('#start').trigger('click'); });
+        navigator.mediaSession.setActionHandler('stop', function () { if (isPlaying) $('#start').trigger('click'); });
+    }
+
+    navigator.mediaSession.playbackState = playing ? 'playing' : 'paused';
+}
+
+// ---- sleep timer ----
+const sleepChoices = [0, 30, 60, 90]; // minutes, 0 = off
+const sleepFadeSeconds = 30;
+let sleepChoiceIndex = 0;
+let sleepTimeouts = [];
+
+$('.sleeptimer').on('click', function () {
+    sleepChoiceIndex = (sleepChoiceIndex + 1) % sleepChoices.length;
+    armSleepTimer();
+    return false;
+});
+
+function armSleepTimer() {
+    clearSleepTimer(false);
+    const minutes = sleepChoices[sleepChoiceIndex];
+
+    if (minutes == 0) {
+        $('.sleeptimer').text('timer').removeClass('armed');
+        return;
+    }
+
+    $('.sleeptimer').text(minutes + 'm').addClass('armed');
+
+    // fade out during the last sleepFadeSeconds, then pause
+    sleepTimeouts.push(setTimeout(function () {
+        if (!isPlaying || !sleepGainNode) return;
+        sleepGainNode.gain.setValueAtTime(1, audioContext.currentTime);
+        sleepGainNode.gain.exponentialRampToValueAtTime(0.001, audioContext.currentTime + sleepFadeSeconds);
+    }, minutes * 60000 - sleepFadeSeconds * 1000));
+
+    sleepTimeouts.push(setTimeout(function () {
+        if (isPlaying) $('#start').trigger('click');
+    }, minutes * 60000));
+}
+
+function clearSleepTimer(resetLabel) {
+    for (const sleepTimeout of sleepTimeouts) {
+        clearTimeout(sleepTimeout);
+    }
+    sleepTimeouts = [];
+
+    if (sleepGainNode && audioContext) {
+        const wasFaded = sleepGainNode.gain.value < 0.9;
+        sleepGainNode.gain.cancelScheduledValues(audioContext.currentTime);
+        // if the fade already kicked in, restore the gain after the 2s stop fade
+        sleepGainNode.gain.setValueAtTime(1, audioContext.currentTime + (wasFaded ? 2.5 : 0));
+    }
+
+    if (resetLabel) {
+        sleepChoiceIndex = 0;
+        $('.sleeptimer').text('timer').removeClass('armed');
+    }
+}
+
+// ---- audio-reactive visuals ----
+let energyFrame;
+let smoothedEnergy = 0;
+const energyData = new Uint8Array(128);
+
+function startEnergyAnimation() {
+    cancelAnimationFrame(energyFrame);
+    const noiseEl = document.querySelector('.noise');
+    const titleEl = document.getElementById('titlecontainer');
+
+    (function tick() {
+        analyser.getByteFrequencyData(energyData);
+        let sum = 0;
+        for (let i = 0; i < energyData.length; i++) {
+            sum += energyData[i];
+        }
+        const energy = sum / energyData.length / 255;
+        smoothedEnergy += (energy - smoothedEnergy) * 0.05;
+
+        noiseEl.style.opacity = Math.min(1, 0.45 + smoothedEnergy * 0.5);
+        titleEl.style.opacity = Math.min(1, 0.7 + smoothedEnergy * 0.8);
+
+        energyFrame = requestAnimationFrame(tick);
+    })();
+}
+
+function stopEnergyAnimation() {
+    cancelAnimationFrame(energyFrame);
+    document.querySelector('.noise').style.opacity = '';
+    document.getElementById('titlecontainer').style.opacity = '';
+}
+
+// ---- click to drop a note ----
+$('.dropscanvas').on('click', function (e) {
+    if (!isPlaying) return;
+
+    setupSamples(samplePathsSines).then((response) => {
+        // top-to-bottom bands mapped to notes high-to-low, like the scheduled drops
+        const bandToSample = [5, 0, 4, 3, 2, 1]; // d5, b4, gsharp4, f4, e4, d4
+        const yFraction = e.clientY / window.innerHeight;
+        const sampleIndex = bandToSample[Math.min(5, Math.floor(yFraction * 6))];
+
+        let pan = Math.max(-0.99, Math.min(0.99, (e.clientX / window.innerWidth) * 2 - 1));
+        if (Math.abs(pan) < 0.02) pan = 0.02; // keep the panned (and delayed) signal path
+
+        playSample(response[sampleIndex], 0, false, pan);
+        showDrop(samplePathsSines[sampleIndex], (e.clientX / window.innerWidth) * 100, 'sine', (yFraction * 100) + '%');
+    });
+});
+
+if ('serviceWorker' in navigator) {
+    window.addEventListener('load', function () {
+        navigator.serviceWorker.register('/sw.js');
+    });
+}
 
 $('#stop').on('click', function () {
     gainNode.gain.exponentialRampToValueAtTime(1, audioContext.currentTime);
@@ -289,7 +459,7 @@ function setupSamples(paths) {
 }
 
 function randomIntFromInterval(min, max, type, isDeep) {
-    var randomNumber = Math.floor(Math.random() * (max - min + 1) + min)
+    var randomNumber = Math.floor(intervalRng() * (max - min + 1) + min)
 
     if (type == 'sine') {
         // check if note is not too close to others
@@ -373,7 +543,7 @@ function showBaseNote(sampleName) {
     }, 14000);
 }
 
-function showDrop(sampleName, xValue, type) {
+function showDrop(sampleName, xValue, type, yOverride) {
     if (type == 'piano') {
         var yValue = '50%';
         sampleName = sampleName.replace('/audio/piano-', 'p').replace('.mp3', '');
@@ -397,6 +567,10 @@ function showDrop(sampleName, xValue, type) {
             if (sineDropYPositions[i].name == sampleName) {
                 yValue = sineDropYPositions[i].yval;
             }
+        }
+
+        if (yOverride) {
+            yValue = yOverride;
         }
 
         $('.dropscanvas').append('<div data-sample="' + sampleName + '" class="drop" style="top: ' + yValue + '; left: ' + xValue + '%"></div>');
@@ -427,11 +601,12 @@ $('.share').on('click', function () {
 function copyShareText() {
     // Get the text field
     var timetext = getTimeString();
+    var shareUrl = 'https://infiniteafternoon.com/?afternoon=' + seed.toString(36);
     let copyText = '';
     if (timetext.length == 0) {
-        copyText = 'I am almost listening to infiniteafternoon.com';
+        copyText = 'I am almost listening to ' + shareUrl;
     } else {
-        copyText = 'I listened to infiniteafternoon.com for ' + timetext + '.';
+        copyText = 'I listened to ' + shareUrl + ' for ' + timetext + '. That exact afternoon is in the link.';
     }
 
     $('.share').addClass('copied');

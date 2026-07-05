@@ -359,6 +359,27 @@ button {
     opacity: .5;
 }
 
+.sleeptimer {
+    display: block;
+    position: absolute;
+    top: 296px;
+    left: 84px;
+    text-align: center;
+    font-family: 'Staatliches';
+    font-size: 1.2em;
+    color: $lightAltColor;
+    opacity: .35;
+    transition: opacity .3s ease-in-out;
+
+    &:hover {
+        opacity: .6;
+    }
+
+    &.armed {
+        opacity: .8;
+    }
+}
+
 .info {
     display: block;
     position: absolute;
