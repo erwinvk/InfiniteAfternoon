@@ -380,6 +380,27 @@ button {
     }
 }
 
+.midilink {
+    display: block;
+    position: absolute;
+    top: 322px;
+    left: 90px;
+    text-align: center;
+    font-family: 'Staatliches';
+    font-size: .9em;
+    color: $lightAltColor;
+    opacity: .3;
+    transition: opacity .3s ease-in-out;
+
+    &:hover {
+        opacity: .6;
+    }
+
+    &.connected {
+        opacity: .8;
+    }
+}
+
 .info {
     display: block;
     position: absolute;

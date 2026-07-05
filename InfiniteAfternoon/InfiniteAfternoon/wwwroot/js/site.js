@@ -392,6 +392,140 @@ $('.dropscanvas').on('click', function (e) {
     });
 });
 
+// ---- computer keyboard notes ----
+const keyboardSineKeys = { 'a': 1, 's': 2, 'd': 3, 'f': 4, 'g': 0, 'h': 5 }; // d4 e4 f4 gsharp4 b4 d5
+const keyboardPianoKeys = { 'z': 2, 'x': 3, 'c': 4, 'v': 0, 'b': 1 }; // d2 e2 gsharp2 a2 b2
+
+$(document).on('keydown', function (e) {
+    if (!isPlaying || e.repeat || e.metaKey || e.ctrlKey || e.altKey) return;
+    if (e.target && (e.target.tagName == 'INPUT' || e.target.tagName == 'TEXTAREA')) return;
+
+    const key = e.key.toLowerCase();
+    let paths, sampleIndex, type;
+
+    if (key in keyboardSineKeys) {
+        paths = samplePathsSines;
+        sampleIndex = keyboardSineKeys[key];
+        type = 'sine';
+    } else if (key in keyboardPianoKeys) {
+        paths = samplePathsPiano;
+        sampleIndex = keyboardPianoKeys[key];
+        type = 'piano';
+    } else {
+        return;
+    }
+
+    setupSamples(paths).then(function (response) {
+        let pan = (Math.random() * 1.6) - 0.8;
+        if (Math.abs(pan) < 0.02) pan = 0.02;
+        playSample(response[sampleIndex], 0, false, pan);
+        showDrop(paths[sampleIndex], (pan + 1) * 50, type);
+    });
+});
+
+// ---- web midi ----
+// root notes of the samples, so any midi note can be pitched from the nearest one
+const sineRootNotes = [
+    { index: 0, midi: 71 }, // b4
+    { index: 1, midi: 62 }, // d4
+    { index: 2, midi: 64 }, // e4
+    { index: 3, midi: 65 }, // f4
+    { index: 4, midi: 68 }, // gsharp4
+    { index: 5, midi: 74 }  // d5
+];
+const pianoRootNotes = [
+    { index: 0, midi: 45 }, // a2
+    { index: 1, midi: 47 }, // b2
+    { index: 2, midi: 38 }, // d2
+    { index: 3, midi: 40 }, // e2
+    { index: 4, midi: 44 }  // gsharp2
+];
+
+$('.midilink').on('click', function () {
+    connectMidi();
+    return false;
+});
+
+// reconnect silently when access was granted in an earlier visit
+try {
+    if (navigator.permissions && navigator.requestMIDIAccess) {
+        navigator.permissions.query({ name: 'midi' }).then(function (status) {
+            if (status.state == 'granted') connectMidi();
+        }).catch(function () { });
+    }
+} catch (e) { }
+
+function connectMidi() {
+    if (!navigator.requestMIDIAccess) {
+        $('.midilink').text('no midi');
+        return;
+    }
+
+    navigator.requestMIDIAccess().then(function (access) {
+        function attachInputs() {
+            let inputCount = 0;
+            access.inputs.forEach(function (input) {
+                input.onmidimessage = onMidiMessage;
+                inputCount++;
+            });
+            $('.midilink').text(inputCount > 0 ? 'midi ✓' : 'no midi').toggleClass('connected', inputCount > 0);
+        }
+
+        access.onstatechange = attachInputs;
+        attachInputs();
+    }, function () {
+        $('.midilink').text('no midi');
+    });
+}
+
+function onMidiMessage(message) {
+    const command = message.data[0] & 0xf0;
+    const note = message.data[1];
+    const velocity = message.data[2];
+
+    if (command == 0x90 && velocity > 0) {
+        playMidiNote(note, velocity);
+    }
+}
+
+function playMidiNote(noteNumber, velocity) {
+    if (!isPlaying) return;
+
+    const useLowSet = noteNumber < 55;
+    const roots = useLowSet ? pianoRootNotes : sineRootNotes;
+    const paths = useLowSet ? samplePathsPiano : samplePathsSines;
+
+    let nearest = roots[0];
+    for (const root of roots) {
+        if (Math.abs(root.midi - noteNumber) < Math.abs(nearest.midi - noteNumber)) {
+            nearest = root;
+        }
+    }
+
+    setupSamples(paths).then(function (response) {
+        const source = audioContext.createBufferSource();
+        source.buffer = response[nearest.index];
+        source.playbackRate.value = Math.pow(2, (noteNumber - nearest.midi) / 12);
+
+        const velocityGain = audioContext.createGain();
+        velocityGain.gain.value = velocity / 127;
+
+        const panNode = audioContext.createStereoPanner();
+        const pan = (Math.random() * 1.2) - 0.6;
+        panNode.pan.value = pan;
+
+        source.connect(velocityGain);
+        velocityGain.connect(panNode);
+        panNode.connect(gainNode);
+        panNode.connect(masterDelayNode);
+        source.start(0);
+
+        // drop where the pitch sits: high notes near the top
+        const yPercent = Math.max(5, Math.min(95, 100 - ((noteNumber - 30) / 60) * 100));
+        showDrop(paths[nearest.index], (pan + 1) * 50, useLowSet ? 'piano' : 'sine', useLowSet ? undefined : yPercent + '%');
+    });
+}
+
 if ('serviceWorker' in navigator) {
     window.addEventListener('load', function () {
         navigator.serviceWorker.register('/sw.js');
