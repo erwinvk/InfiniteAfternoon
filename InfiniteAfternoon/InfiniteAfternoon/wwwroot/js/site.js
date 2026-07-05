@@ -240,6 +240,7 @@ $('#start').on('click', function () {
             var randomSampleNumber = Math.floor(subRng() * response.length);
 
             playSample(response[randomSampleNumber], 0, false);
+            showSubPulse();
         }, subInterval);
     });
 
@@ -310,6 +311,7 @@ function armSleepTimer() {
     }
 
     $('.sleeptimer').text(minutes + 'm').addClass('armed');
+    startSunset(minutes);
 
     // fade out during the last sleepFadeSeconds, then pause
     sleepTimeouts.push(setTimeout(function () {
@@ -340,6 +342,26 @@ function clearSleepTimer(resetLabel) {
         sleepChoiceIndex = 0;
         $('.sleeptimer').text('timer').removeClass('armed');
     }
+
+    resetSunset();
+}
+
+// while the sleep timer runs, the circle sinks like a setting sun
+function startSunset(minutes) {
+    const circle = $('#start').closest('.themiddle')[0];
+    circle.style.transition = 'transform ' + (minutes * 60) + 's linear, opacity ' + (minutes * 60) + 's linear';
+    circle.getBoundingClientRect(); // flush, so the transition starts from the current position
+    circle.style.transform = 'translateZ(0) translateY(38vh)';
+    circle.style.opacity = '0.3';
+}
+
+function resetSunset() {
+    const circle = $('#start').closest('.themiddle')[0];
+    if (!circle.style.transform) return;
+    circle.style.transition = 'transform 2s ease-in-out, opacity 2s ease-in-out';
+    circle.style.transform = '';
+    circle.style.opacity = '';
+    setTimeout(function () { circle.style.transition = ''; }, 2100);
 }
 
 // ---- audio-reactive visuals ----
@@ -348,9 +370,12 @@ let smoothedEnergy = 0;
 const energyData = new Uint8Array(128);
 
 function startEnergyAnimation() {
+    if (reducedMotion) return;
+
     cancelAnimationFrame(energyFrame);
     const noiseEl = document.querySelector('.noise');
     const titleEl = document.getElementById('titlecontainer');
+    const titleTextEl = titleEl.querySelector('h1');
 
     (function tick() {
         analyser.getByteFrequencyData(energyData);
@@ -363,6 +388,8 @@ function startEnergyAnimation() {
 
         noiseEl.style.opacity = Math.min(1, 0.45 + smoothedEnergy * 0.5);
         titleEl.style.opacity = Math.min(1, 0.7 + smoothedEnergy * 0.8);
+        // shimmer: shift the title gradient with the swells of the music
+        titleTextEl.style.backgroundPosition = '0 ' + (50 + smoothedEnergy * 150) + '%';
 
         energyFrame = requestAnimationFrame(tick);
     })();
@@ -372,6 +399,16 @@ function stopEnergyAnimation() {
     cancelAnimationFrame(energyFrame);
     document.querySelector('.noise').style.opacity = '';
     document.getElementById('titlecontainer').style.opacity = '';
+    document.querySelector('#titlecontainer h1').style.backgroundPosition = '';
+}
+
+function showSubPulse() {
+    const pulse = $('<div class="subpulse"></div>');
+    $('.dropscanvas').append(pulse);
+
+    setTimeout(function () {
+        pulse.remove();
+    }, 12500);
 }
 
 // ---- click to drop a note ----
@@ -525,6 +562,21 @@ function playMidiNote(noteNumber, velocity) {
         showDrop(paths[nearest.index], (pan + 1) * 50, useLowSet ? 'piano' : 'sine', useLowSet ? undefined : yPercent + '%');
     });
 }
+
+// soft glow following the pointer, hints that clicking drops a note
+const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+const finePointer = window.matchMedia('(pointer: fine)').matches;
+let cursorGlow;
+
+$(document).on('mousemove', function (e) {
+    if (reducedMotion || !finePointer) return;
+
+    if (!cursorGlow) {
+        cursorGlow = $('<div class="cursorglow"></div>').appendTo('body');
+    }
+
+    cursorGlow.css('transform', 'translate(' + (e.clientX - 22) + 'px, ' + (e.clientY - 22) + 'px)');
+});
 
 if ('serviceWorker' in navigator) {
     window.addEventListener('load', function () {
@@ -774,6 +826,11 @@ function displayTimeElapsed() {
     }
 
     $('.time').text(timetext);
+
+    // dusk creeps in the longer the afternoon lasts (fully there around 60 min)
+    var elapsedMinutes = (endTime - startTime) / 60000;
+    document.querySelector('.dusk').style.opacity = Math.min(.8, elapsedMinutes / 75);
+
     setTimeout(displayTimeElapsed, 5000);
 }
 

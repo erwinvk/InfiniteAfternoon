@@ -409,10 +409,23 @@ button {
     width: 550px;
     padding: 30px;
     margin: 0 auto;
-    background: #AECFDF99;
+    background: rgba(174, 207, 223, .45);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
     opacity: 1;
     visibility: visible;
     transition: opacity .7s ease-in-out;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(25, 25, 25, .35) transparent;
+
+    &::-webkit-scrollbar {
+        width: 6px;
+    }
+
+    &::-webkit-scrollbar-thumb {
+        background: rgba(25, 25, 25, .35);
+        border-radius: 3px;
+    }
 
     // .themiddle (this panel's positioning parent) is exactly viewport-centered,
     // its padding box is 240x240, so offsets from 120px land on the viewport center
@@ -677,29 +690,21 @@ button {
 
 // waves start
 
+// subtle horizon at the bottom of the viewport, the drops fall into it
 .wavescontainer {
+    pointer-events: none;
     position: fixed;
+    bottom: 0;
+    left: 0;
     width: 100%;
-    height: 100%;
     z-index: -1;
-
-    &:after {
-        content: '';
-        position: fixed;
-        bottom: 0;
-        left: 0;
-        width: 100%;
-        height: 32%;
-        background: #5168A7;
-    }
 }
 
 .waves {
-    position: relative;
+    display: block;
     width: 100%;
-    height: 200px;
+    height: 110px;
     margin-bottom: -7px; /*Fix for safari gap*/
-    margin-top: 133px;
 }
 
 .parallax > use {
@@ -744,3 +749,71 @@ button {
 }
 
 // waves end
+
+// slow wide pulse rising from the bottom when a sub plays
+.dropscanvas .subpulse {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    height: 45%;
+    background: linear-gradient(rgba(81, 104, 167, 0) 0%, rgba(58, 68, 110, .3) 100%);
+    animation: subpulse 12s ease-in-out 1;
+    opacity: 0;
+    pointer-events: none;
+}
+
+@keyframes subpulse {
+    0% {
+        transform: translateY(35%);
+        opacity: 0;
+    }
+
+    30% {
+        opacity: 1;
+    }
+
+    70% {
+        opacity: .5;
+    }
+
+    100% {
+        transform: translateY(0);
+        opacity: 0;
+    }
+}
+
+// soft glow following the pointer, hints that clicking drops a note
+.cursorglow {
+    pointer-events: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(174, 207, 223, .16) 0%, rgba(174, 207, 223, 0) 70%);
+    z-index: 50;
+}
+
+// the afternoon slowly turns to dusk the longer you listen
+.dusk {
+    pointer-events: none;
+    position: fixed;
+    inset: 0;
+    z-index: -1;
+    background: linear-gradient(rgba(25, 25, 25, 0) 30%, rgba(90, 45, 80, .5) 75%, rgba(160, 80, 50, .5) 100%);
+    opacity: 0;
+    transition: opacity 60s linear;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    #titlecontainer,
+    #titlecontainer h1,
+    .themiddle,
+    .noise,
+    .dusk,
+    .parallax > use {
+        animation: none !important;
+    }
+}
