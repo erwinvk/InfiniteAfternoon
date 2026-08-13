@@ -1,874 +1,698 @@
-﻿// Samples --> gainNode --> masterVolumeGainNode --> speakers
-var startTime;
+// Infinite Afternoon — player.
+// The composition itself lives in /score.json; this file only performs it.
+// Signal path: sample -> [pan -> delay] -> gainNode -> volume -> sleep -> speakers
+(function () {
+    'use strict';
 
-const deltaTimeWarp = 25000; // fast forward 25 s so no big silence at the start
-//const minSineInterval = 3000; // test
-//const maxSineInterval = 20000; // test
-const minSineInterval = 16500;
-const maxSineInterval = 65000;
+    const $ = (sel) => document.querySelector(sel);
 
-const minPianoInterval = 22500;
-const maxPianoInterval = 125000;
+    // ---- score ----
+    let score = null;
+    const scoreReady = fetch('/score.json')
+        .then((r) => r.json())
+        .then((s) => { score = s; return s; })
+        .catch((err) => { console.error('could not load score', err); return null; });
 
-//const minSubInterval = 1000; // test
-//const maxSubInterval = 6000; // test
-const minSubInterval = 60000; // 1 minute
-const maxSubInterval = 300000; // 5 minutes
-
-//const minFXInterval = 2000;
-//const maxFXInterval = 20000; 
-const minFXInterval = 45000; 
-const maxFXInterval = 900000; // 15 minutes
-
-let randomSineIntervals = [];
-let randomPianoIntervals = [];
-let randomFxIntervals = [];
-
-let isPlaying = false;
-let audioContext;
-let analyser;
-let gainNode;
-let masterVolumeGainNode;
-let masterDelayGainNode;
-let masterDelayFeedbackNode;
-let masterDelayNode;
-let sleepGainNode;
-let nowPlaying = [];
-let pendingTimeouts = new Set();
-const bufferCache = new Map();
-
-// every afternoon has a seed; the same seed in the url replays the same schedule
-const seed = (function () {
-    const param = new URLSearchParams(window.location.search).get('afternoon');
-    if (param) {
-        const parsed = parseInt(param, 36);
-        if (!isNaN(parsed)) return parsed >>> 0;
-    }
-    return (Math.random() * 4294967296) >>> 0;
-})();
-let intervalRng;
-
-function mulberry32(a) {
-    return function () {
-        a |= 0; a = a + 0x6D2B79F5 | 0;
-        let t = Math.imul(a ^ a >>> 15, 1 | a);
-        t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
-        return ((t ^ t >>> 14) >>> 0) / 4294967296;
-    }
-}
-
-function randomPanValue(rng) {
-    return (Math.ceil(rng() * 99) * (rng() < 0.5 ? 1 : -1)) / 100;
-}
-
-const samplePathLoops = ['/audio/drone-loop-e2.mp3', '/audio/drone-loop-b2.mp3', '/audio/drone-loop-a2.mp3', '/audio/drone-loop-f2.mp3', '/audio/drone-loop-gsharp2.mp3', '/audio/drone-loop-d3.mp3'];
-const samplePathsSines = ['/audio/sine-b4.mp3', '/audio/sine-d4.mp3', '/audio/sine-e4.mp3', '/audio/sine-f4.mp3', '/audio/sine-gsharp4.mp3', '/audio/sine-d5.mp3'];
-const samplePathsPiano = ['/audio/piano-a2.mp3', '/audio/piano-b2.mp3', '/audio/piano-d2.mp3', '/audio/piano-e2.mp3', '/audio/piano-gsharp2.mp3'];
-const samplePathsSubs = ['/audio/sub-e0.mp3', '/audio/sub-e0-2.mp3'];
-const samplePathsFX = ['/audio/fx-birdlike.mp3', '/audio/fx-pizzi1.mp3', '/audio/fx-pizzi2.mp3', '/audio/fx-pizzi3.mp3', '/audio/fx-pizzi4.mp3', '/audio/fx-pizzi5.mp3'];
-
-let loopYPositions = [];
-loopYPositions.push({ name: 'd3', yval: '15%' });
-loopYPositions.push({ name: 'b2', yval: '25%' });
-loopYPositions.push({ name: 'a2', yval: '40%' });
-loopYPositions.push({ name: 'gsharp2', yval: '55%' });
-loopYPositions.push({ name: 'f2', yval: '70%' });
-loopYPositions.push({ name: 'e2', yval: '85%' });
-
-let sineDropYPositions = [];
-sineDropYPositions.push({ name:'d5', yval: '10%' });
-sineDropYPositions.push({ name: 'b4', yval: '25%' });
-sineDropYPositions.push({ name: 'gsharp4', yval:'35%' });
-sineDropYPositions.push({ name: 'f4', yval: '45%' });
-sineDropYPositions.push({ name: 'e4', yval: '55%' });
-sineDropYPositions.push({ name: 'd4', yval: '65%' });
-
-let pianoDropYPositions = [];
-pianoDropYPositions.push({ name: 'pb2', yval: '80%' });
-pianoDropYPositions.push({ name: 'pa2', yval: '83%' });
-pianoDropYPositions.push({ name: 'pgsharp2', yval: '85%' });
-pianoDropYPositions.push({ name: 'pd2', yval: '90%' });
-pianoDropYPositions.push({ name: 'pe2', yval: '95%' });
-pianoDropYPositions.push({ name: 'pf2', yval: '98%' });
-
-$('#volumecontrol').on('input', function () {
-    var volval = parseInt($(this).val()) / 100;
-    masterVolumeGainNode.gain.value = volval;
-});
-
-//startCtxBtn.addEventListener('click', () => {
-$('#start').on('click', function () {
-    if ($(this).hasClass('pause')) {
-        gainNode.gain.exponentialRampToValueAtTime(1, audioContext.currentTime);
-        gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 2);
-
-        for (const pendingTimeout of pendingTimeouts) {
-            clearTimeout(pendingTimeout);
+    // ---- seeded randomness ----
+    // every afternoon has a seed; the same seed in the url replays the same schedule
+    const seed = (function () {
+        const param = new URLSearchParams(window.location.search).get('afternoon');
+        if (param) {
+            const parsed = parseInt(param, 36);
+            if (!isNaN(parsed)) return parsed >>> 0;
         }
-        pendingTimeouts.clear();
-        console.log('Intervals cleared');
+        return (Math.random() * 4294967296) >>> 0;
+    })();
 
-        setTimeout(function () {
-            for (let i = 0; i < nowPlaying.length; i++) {
-                nowPlaying[i].stop()
-            }
-
-            nowPlaying = [];
-        }, 2000);
-        $(this).removeClass('pause')
-        console.log('samples stopped');
-        isPlaying = false;
-        clearSleepTimer(true);
-        stopEnergyAnimation();
-        updateMediaSession(false);
-        return false;
+    function mulberry32(a) {
+        return function () {
+            a |= 0; a = a + 0x6D2B79F5 | 0;
+            let t = Math.imul(a ^ a >>> 15, 1 | a);
+            t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+            return ((t ^ t >>> 14) >>> 0) / 4294967296;
+        };
     }
 
-    // build the audio graph once; on resume we reuse the context and cached buffers
-    if (!audioContext) {
+    function randomPan(rng) {
+        return (Math.ceil(rng() * 99) * (rng() < 0.5 ? 1 : -1)) / 100;
+    }
+
+    let intervalRng;
+    let lastPlans = null;   // the schedule drawn for this seed, handy when tuning a score
+
+    // draw an interval, keeping it away from the ones already drawn for this layer
+    function drawInterval(min, max, taken, spacing, record) {
+        let n = Math.floor(intervalRng() * (max - min + 1) + min);
+
+        if (spacing) {
+            for (let i = 0; i < taken.length; i++) {
+                if (Math.abs(taken[i] - n) < spacing) {
+                    n = drawInterval(min, max, taken, spacing, false);
+                }
+            }
+        }
+
+        if (record) taken.push(n);
+        return n;
+    }
+
+    // ---- audio graph ----
+    let isPlaying = false;
+    let audioContext, analyser, gainNode, volumeNode, sleepNode, delayNode, delayFeedbackNode;
+    let startTime;
+    const looping = [];              // sources that must be stopped by hand
+    const pendingTimeouts = new Set();
+    const bufferCache = new Map();
+
+    function buildGraph() {
+        if (audioContext) return;
+
         audioContext = new AudioContext();
-        masterVolumeGainNode = audioContext.createGain();
-        masterVolumeGainNode.gain.value = parseInt($('#volumecontrol').val()) / 100;
+
+        volumeNode = audioContext.createGain();
+        volumeNode.gain.value = parseInt($('#volumecontrol').value, 10) / 100;
 
         // sleep timer fades this separate node, so the volume slider stays untouched
-        sleepGainNode = audioContext.createGain();
-        masterVolumeGainNode.connect(sleepGainNode);
-        sleepGainNode.connect(audioContext.destination);
+        sleepNode = audioContext.createGain();
+        volumeNode.connect(sleepNode);
+        sleepNode.connect(audioContext.destination);
 
         // tap for the audio-reactive visuals
         analyser = audioContext.createAnalyser();
         analyser.fftSize = 256;
         analyser.smoothingTimeConstant = 0.85;
-        sleepGainNode.connect(analyser);
+        sleepNode.connect(analyser);
 
         gainNode = audioContext.createGain();
-        gainNode.connect(masterVolumeGainNode);
+        gainNode.connect(volumeNode);
 
-        masterDelayFeedbackNode = audioContext.createGain();
-        masterDelayFeedbackNode.gain.value = 0.3;
+        delayFeedbackNode = audioContext.createGain();
+        delayFeedbackNode.gain.value = 0.3;
 
-        var biquadFilter = audioContext.createBiquadFilter();
+        const biquadFilter = audioContext.createBiquadFilter();
         biquadFilter.type = 'lowpass';
         biquadFilter.frequency.value = 600;
-        //biquadFilter.Q.value = 20;
 
-        masterDelayNode = audioContext.createDelay(3);
-        masterDelayNode.delayTime.value = 1.4;
-        masterDelayNode.connect(biquadFilter);
-        biquadFilter.connect(masterDelayFeedbackNode);
-        masterDelayFeedbackNode.connect(masterDelayNode);
-        masterDelayFeedbackNode.connect(gainNode);
-
-        console.log('audiocontext started...');
+        delayNode = audioContext.createDelay(3);
+        delayNode.delayTime.value = 1.4;
+        delayNode.connect(biquadFilter);
+        biquadFilter.connect(delayFeedbackNode);
+        delayFeedbackNode.connect(delayNode);
+        delayFeedbackNode.connect(gainNode);
     }
 
-    randomSineIntervals = [];
-    randomPianoIntervals = [];
-    randomFxIntervals = [];
+    async function getBuffer(file) {
+        const path = score.audioBase + file;
+        // decoded buffers are cached, so pause/resume does not re-download or re-decode
+        if (bufferCache.has(path)) return bufferCache.get(path);
 
-    // draw the whole schedule up front from the seeded rng, so the same seed
-    // always produces the same afternoon regardless of sample load order
-    intervalRng = mulberry32(seed);
-    history.replaceState(null, '', '?afternoon=' + seed.toString(36));
+        const response = await fetch(path);
+        const arrayBuffer = await response.arrayBuffer();
+        const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
+        bufferCache.set(path, audioBuffer);
+        return audioBuffer;
+    }
 
-    const sineIntervals = samplePathsSines.map(function () { return randomIntFromInterval(minSineInterval, maxSineInterval, 'sine'); });
-    const pianoIntervals = samplePathsPiano.map(function () { return randomIntFromInterval(minPianoInterval, maxPianoInterval, 'piano'); });
-    const subInterval = randomIntFromInterval(minSubInterval, maxSubInterval, 'sub');
-    const fxIntervals = samplePathsFX.map(function () { return randomIntFromInterval(minFXInterval, maxFXInterval, 'fx'); });
+    // load every sample of a layer in parallel
+    function loadLayer(layer) {
+        return Promise.all(layer.samples.map((s) => getBuffer(s.file)));
+    }
 
-    $(this).addClass('pause');
+    function playBuffer(buffer, pan, loop) {
+        const source = audioContext.createBufferSource();
+        source.buffer = buffer;
+        source.loop = !!loop;
 
-    // Loads and play loops
-    setupSamples(samplePathLoops).then((response) => {
-        var interval = 14000;
-
-        for (var i = 0; i < response.length; i++) {
-            (function (i, interval) {
-                customInterval(function () {
-                    playSample(response[i], 0, false);
-                    showBaseNote(samplePathLoops[i]);
-                }, interval, true, 13500);
-            })(i, interval);
-            interval += 7700;
+        if (pan) {
+            const panNode = audioContext.createStereoPanner();
+            panNode.pan.setValueAtTime(pan, audioContext.currentTime);
+            source.connect(panNode);
+            panNode.connect(gainNode);
+            panNode.connect(delayNode);
+        } else {
+            source.connect(gainNode);
         }
 
-        console.log('initing loop ' + i);
+        source.start(0);
+        if (loop) looping.push(source);
+        return source;
+    }
 
-        //fade them in
-        gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime);
-        gainNode.gain.exponentialRampToValueAtTime(1, audioContext.currentTime + 2);
-    });
+    // repeating timer that skips ahead on its first run, so the piece does not
+    // open with a long silence
+    function repeat(callback, interval, warp) {
+        let first = interval;
 
-    // Sines
-    setupSamples(samplePathsSines).then((response) => {
-        for (var i = 0; i < response.length; i++) {
-            (function (i) {
-                const noteRng = mulberry32(seed + 1000 + i);
-                customInterval(function () {
-                    var randomPan = randomPanValue(noteRng);
-                    playSample(response[i], 0, false, randomPan);
-                    showDrop(samplePathsSines[i], (randomPan + 1) * 50, 'sine');
-                }, sineIntervals[i], true)
-            })(i);
-
-            console.log('initing note ' + i + ' on interval ' + sineIntervals[i]);
+        if (warp) {
+            first = interval - warp;
+            if (first < 0) first = interval - Math.abs(interval - warp);
         }
-    });
 
-    // Piano
-    setupSamples(samplePathsPiano).then((response) => {
-        for (var i = 0; i < response.length; i++) {
-            (function (i) {
-                const noteRng = mulberry32(seed + 2000 + i);
-                customInterval(function () {
-                    var randomPan = randomPanValue(noteRng);
-                    playSample(response[i], 0, false, randomPan);
-                    showDrop(samplePathsPiano[i], (randomPan + 1) * 50, 'piano');
-                }, pianoIntervals[i], true)
-            })(i);
+        (function schedule(delay) {
+            const timeout = setTimeout(function () {
+                pendingTimeouts.delete(timeout);
+                if (!isPlaying) return;
+                callback();
+                schedule(interval);
+            }, Math.abs(delay));
 
-            console.log('initing note ' + i + ' on interval ' + pianoIntervals[i]);
-        }
-    });
+            pendingTimeouts.add(timeout);
+        })(first);
+    }
 
-    // subs. Don't want these possibly looping over another, so pick a random interval and at that interval play one of the subs.
-    setupSamples(samplePathsSubs).then((response) => {
-        const subRng = mulberry32(seed + 3000);
+    // ---- performing the score ----
+    function start() {
+        buildGraph();
 
-        customInterval(function () {
-            //pick a random sub sample
-            var randomSampleNumber = Math.floor(subRng() * response.length);
+        intervalRng = mulberry32(seed);
+        history.replaceState(null, '', '?afternoon=' + seed.toString(36));
 
-            playSample(response[randomSampleNumber], 0, false);
-            showSubPulse();
-        }, subInterval);
-    });
+        // draw every interval up front, in score order, so the same seed always
+        // produces the same afternoon no matter how fast the samples load
+        lastPlans = score.layers.map(function (layer) {
+            if (layer.mode !== 'random') return null;
 
-    // FX
-    setupSamples(samplePathsFX).then((response) => {
-        for (var i = 0; i < response.length; i++) {
-            (function (i) {
-                const noteRng = mulberry32(seed + 4000 + i);
-                customInterval(function () {
-                    var randomPan = randomPanValue(noteRng);
-                    playSample(response[i], 0, false, randomPan);
-                    console.log('now playing FX ' + fxIntervals[i]);
-                }, fxIntervals[i], true)
-            })(i);
+            const taken = [];
+            const warp = layer.warpFirst === true ? score.timewarp : layer.warpFirst;
 
-            console.log('initing note ' + i + ' on interval ' + fxIntervals[i]);
-        }
-    });
+            if (layer.pickOne) {
+                return { intervals: [drawInterval(layer.interval[0], layer.interval[1], taken, layer.minSpacing, true)], warp: warp };
+            }
 
-    // set start time
-    isPlaying = true;
-    startTime = new Date();
-    updateMediaSession(true);
-    startEnergyAnimation();
-    displayTimeElapsed();
-});
-
-function updateMediaSession(playing) {
-    if (!('mediaSession' in navigator)) return;
-
-    if (!navigator.mediaSession.metadata) {
-        navigator.mediaSession.metadata = new MediaMetadata({
-            title: 'Infinite Afternoon',
-            artist: 'Erwin van Kester',
-            album: 'infiniteafternoon.com',
-            artwork: [
-                { src: '/img/icon-192.png', sizes: '192x192', type: 'image/png' },
-                { src: '/img/icon-512.png', sizes: '512x512', type: 'image/png' }
-            ]
+            return {
+                intervals: layer.samples.map(function () {
+                    return drawInterval(layer.interval[0], layer.interval[1], taken, layer.minSpacing, true);
+                }),
+                warp: warp
+            };
         });
-        navigator.mediaSession.setActionHandler('play', function () { if (!isPlaying) $('#start').trigger('click'); });
-        navigator.mediaSession.setActionHandler('pause', function () { if (isPlaying) $('#start').trigger('click'); });
-        navigator.mediaSession.setActionHandler('stop', function () { if (isPlaying) $('#start').trigger('click'); });
+
+        score.layers.forEach(function (layer, layerIndex) {
+            loadLayer(layer).then(function (buffers) {
+                if (!isPlaying) return;
+
+                if (layer.mode === 'retrigger') {
+                    let offset = layer.every;
+
+                    layer.samples.forEach(function (sample, i) {
+                        repeat(function () {
+                            playBuffer(buffers[i], 0, false);
+                            showVisual(layer, sample);
+                        }, offset, layer.warpFirst);
+                        offset += layer.stagger;
+                    });
+
+                    // fade the piece in
+                    gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime);
+                    gainNode.gain.exponentialRampToValueAtTime(1, audioContext.currentTime + 2);
+                    return;
+                }
+
+                const plan = lastPlans[layerIndex];
+
+                if (layer.pickOne) {
+                    const rng = mulberry32(seed + layer.rngOffset);
+                    repeat(function () {
+                        const i = Math.floor(rng() * buffers.length);
+                        playBuffer(buffers[i], 0, false);
+                        showVisual(layer, layer.samples[i]);
+                    }, plan.intervals[0], plan.warp);
+                    return;
+                }
+
+                layer.samples.forEach(function (sample, i) {
+                    const rng = mulberry32(seed + layer.rngOffset + i);
+                    repeat(function () {
+                        const pan = layer.pan ? randomPan(rng) : 0;
+                        playBuffer(buffers[i], pan, false);
+                        showVisual(layer, sample, (pan + 1) * 50);
+                    }, plan.intervals[i], plan.warp);
+                });
+            });
+        });
+
+        isPlaying = true;
+        startTime = new Date();
+        updateMediaSession(true);
+        startEnergyAnimation();
+        tickElapsed();
     }
 
-    navigator.mediaSession.playbackState = playing ? 'playing' : 'paused';
-}
+    function stop() {
+        isPlaying = false;
 
-// ---- sleep timer ----
-const sleepChoices = [0, 30, 60, 90]; // minutes, 0 = off
-const sleepFadeSeconds = 30;
-let sleepChoiceIndex = 0;
-let sleepTimeouts = [];
+        gainNode.gain.exponentialRampToValueAtTime(1, audioContext.currentTime);
+        gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 2);
 
-$('.sleeptimer').on('click', function () {
-    sleepChoiceIndex = (sleepChoiceIndex + 1) % sleepChoices.length;
-    armSleepTimer();
-    return false;
-});
+        pendingTimeouts.forEach(clearTimeout);
+        pendingTimeouts.clear();
 
-function armSleepTimer() {
-    clearSleepTimer(false);
-    const minutes = sleepChoices[sleepChoiceIndex];
+        setTimeout(function () {
+            while (looping.length) looping.pop().stop();
+        }, 2000);
 
-    if (minutes == 0) {
-        $('.sleeptimer').text('timer').removeClass('armed');
-        return;
+        clearSleepTimer(true);
+        stopEnergyAnimation();
+        updateMediaSession(false);
     }
 
-    $('.sleeptimer').text(minutes + 'm').addClass('armed');
-    startSunset(minutes);
+    // ---- visuals ----
+    const canvas = $('.dropscanvas');
 
-    // fade out during the last sleepFadeSeconds, then pause
-    sleepTimeouts.push(setTimeout(function () {
-        if (!isPlaying || !sleepGainNode) return;
-        sleepGainNode.gain.setValueAtTime(1, audioContext.currentTime);
-        sleepGainNode.gain.exponentialRampToValueAtTime(0.001, audioContext.currentTime + sleepFadeSeconds);
-    }, minutes * 60000 - sleepFadeSeconds * 1000));
-
-    sleepTimeouts.push(setTimeout(function () {
-        if (isPlaying) $('#start').trigger('click');
-    }, minutes * 60000));
-}
-
-function clearSleepTimer(resetLabel) {
-    for (const sleepTimeout of sleepTimeouts) {
-        clearTimeout(sleepTimeout);
-    }
-    sleepTimeouts = [];
-
-    if (sleepGainNode && audioContext) {
-        const wasFaded = sleepGainNode.gain.value < 0.9;
-        sleepGainNode.gain.cancelScheduledValues(audioContext.currentTime);
-        // if the fade already kicked in, restore the gain after the 2s stop fade
-        sleepGainNode.gain.setValueAtTime(1, audioContext.currentTime + (wasFaded ? 2.5 : 0));
+    // each visual removes its own element; removing by selector would also take
+    // out newer notes of the same sample
+    function addTemporary(html, lifetime) {
+        const element = document.createElement('div');
+        element.className = html.className;
+        if (html.style) element.setAttribute('style', html.style);
+        if (html.sample) element.dataset.sample = html.sample;
+        canvas.appendChild(element);
+        setTimeout(function () { element.remove(); }, lifetime);
+        return element;
     }
 
-    if (resetLabel) {
-        sleepChoiceIndex = 0;
-        $('.sleeptimer').text('timer').removeClass('armed');
-    }
+    function showVisual(layer, sample, xPercent, yOverride) {
+        if (!layer.visual) return;
 
-    resetSunset();
-}
-
-// while the sleep timer runs, the circle sinks like a setting sun
-function startSunset(minutes) {
-    const circle = $('#start').closest('.themiddle')[0];
-    circle.style.transition = 'transform ' + (minutes * 60) + 's linear, opacity ' + (minutes * 60) + 's linear';
-    circle.getBoundingClientRect(); // flush, so the transition starts from the current position
-    circle.style.transform = 'translateZ(0) translateY(38vh)';
-    circle.style.opacity = '0.3';
-}
-
-function resetSunset() {
-    const circle = $('#start').closest('.themiddle')[0];
-    if (!circle.style.transform) return;
-    circle.style.transition = 'transform 2s ease-in-out, opacity 2s ease-in-out';
-    circle.style.transform = '';
-    circle.style.opacity = '';
-    setTimeout(function () { circle.style.transition = ''; }, 2100);
-}
-
-// ---- audio-reactive visuals ----
-let energyFrame;
-let smoothedEnergy = 0;
-const energyData = new Uint8Array(128);
-
-function startEnergyAnimation() {
-    if (reducedMotion) return;
-
-    cancelAnimationFrame(energyFrame);
-    const noiseEl = document.querySelector('.noise');
-    const titleEl = document.getElementById('titlecontainer');
-    const titleTextEl = titleEl.querySelector('h1');
-
-    (function tick() {
-        analyser.getByteFrequencyData(energyData);
-        let sum = 0;
-        for (let i = 0; i < energyData.length; i++) {
-            sum += energyData[i];
+        if (layer.visual === 'band') {
+            addTemporary({ className: 'note', sample: sample.id, style: 'top: ' + (sample.y || '50%') }, layer.visualDuration);
+            return;
         }
-        const energy = sum / energyData.length / 255;
-        smoothedEnergy += (energy - smoothedEnergy) * 0.05;
 
-        noiseEl.style.opacity = Math.min(1, 0.45 + smoothedEnergy * 0.5);
-        titleEl.style.opacity = Math.min(1, 0.7 + smoothedEnergy * 0.8);
-        // shimmer: shift the title gradient with the swells of the music
-        titleTextEl.style.backgroundPosition = '0 ' + (50 + smoothedEnergy * 150) + '%';
+        if (layer.visual === 'subpulse') {
+            addTemporary({ className: 'subpulse' }, layer.visualDuration);
+            return;
+        }
 
-        energyFrame = requestAnimationFrame(tick);
-    })();
-}
+        if (layer.visual === 'drop') {
+            const className = layer.dropClass ? 'drop ' + layer.dropClass : 'drop';
+            const y = yOverride || sample.y || '50%';
+            addTemporary({
+                className: className,
+                sample: sample.id,
+                style: 'top: ' + y + '; left: ' + xPercent + '%'
+            }, layer.visualDuration);
+        }
+    }
 
-function stopEnergyAnimation() {
-    cancelAnimationFrame(energyFrame);
-    document.querySelector('.noise').style.opacity = '';
-    document.getElementById('titlecontainer').style.opacity = '';
-    document.querySelector('#titlecontainer h1').style.backgroundPosition = '';
-}
+    // ---- audio-reactive visuals ----
+    const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const finePointer = window.matchMedia('(pointer: fine)').matches;
+    let energyFrame, smoothedEnergy = 0;
+    const energyData = new Uint8Array(128);
 
-function showSubPulse() {
-    const pulse = $('<div class="subpulse"></div>');
-    $('.dropscanvas').append(pulse);
+    function startEnergyAnimation() {
+        if (reducedMotion) return;
 
-    setTimeout(function () {
-        pulse.remove();
-    }, 12500);
-}
+        cancelAnimationFrame(energyFrame);
+        const noiseEl = $('.noise');
+        const titleEl = $('#titlecontainer');
+        const titleTextEl = titleEl.querySelector('h1');
 
-// ---- click to drop a note ----
-$('.dropscanvas').on('click', function (e) {
-    if (!isPlaying) return;
+        (function tick() {
+            analyser.getByteFrequencyData(energyData);
+            let sum = 0;
+            for (let i = 0; i < energyData.length; i++) sum += energyData[i];
 
-    setupSamples(samplePathsSines).then((response) => {
-        // top-to-bottom bands mapped to notes high-to-low, like the scheduled drops
-        const bandToSample = [5, 0, 4, 3, 2, 1]; // d5, b4, gsharp4, f4, e4, d4
+            const energy = sum / energyData.length / 255;
+            smoothedEnergy += (energy - smoothedEnergy) * 0.05;
+
+            noiseEl.style.opacity = Math.min(1, 0.45 + smoothedEnergy * 0.5);
+            titleEl.style.opacity = Math.min(1, 0.7 + smoothedEnergy * 0.8);
+            // shimmer: shift the title gradient with the swells of the music
+            titleTextEl.style.backgroundPosition = '0 ' + (50 + smoothedEnergy * 150) + '%';
+
+            energyFrame = requestAnimationFrame(tick);
+        })();
+    }
+
+    function stopEnergyAnimation() {
+        cancelAnimationFrame(energyFrame);
+        $('.noise').style.opacity = '';
+        $('#titlecontainer').style.opacity = '';
+        $('#titlecontainer h1').style.backgroundPosition = '';
+    }
+
+    // ---- transport ----
+    const startButton = $('#start');
+
+    startButton.addEventListener('click', function () {
+        if (isPlaying) {
+            stop();
+            startButton.classList.remove('pause');
+            startButton.setAttribute('aria-label', 'Play');
+            return;
+        }
+
+        // build the context synchronously, inside the user gesture, or the
+        // browser hands us a suspended one
+        buildGraph();
+        if (audioContext.state === 'suspended') audioContext.resume();
+
+        scoreReady.then(function () {
+            if (!score) return;
+            startButton.classList.add('pause');
+            startButton.setAttribute('aria-label', 'Pause');
+            start();
+        });
+    });
+
+    $('#volumecontrol').addEventListener('input', function () {
+        if (volumeNode) volumeNode.gain.value = parseInt(this.value, 10) / 100;
+    });
+
+    // ---- sleep timer ----
+    const sleepChoices = [0, 30, 60, 90]; // minutes, 0 = off
+    const sleepFadeSeconds = 30;
+    const sleepButton = $('.sleeptimer');
+    let sleepChoiceIndex = 0;
+    let sleepTimeouts = [];
+
+    sleepButton.addEventListener('click', function () {
+        sleepChoiceIndex = (sleepChoiceIndex + 1) % sleepChoices.length;
+        armSleepTimer();
+    });
+
+    function armSleepTimer() {
+        clearSleepTimer(false);
+        const minutes = sleepChoices[sleepChoiceIndex];
+
+        if (minutes === 0) {
+            sleepButton.textContent = 'timer';
+            sleepButton.classList.remove('armed');
+            sleepButton.setAttribute('aria-label', 'Sleep timer off');
+            return;
+        }
+
+        sleepButton.textContent = minutes + 'm';
+        sleepButton.classList.add('armed');
+        sleepButton.setAttribute('aria-label', 'Sleep timer, ' + minutes + ' minutes');
+        startSunset(minutes);
+
+        // fade out during the last sleepFadeSeconds, then pause
+        sleepTimeouts.push(setTimeout(function () {
+            if (!isPlaying || !sleepNode) return;
+            sleepNode.gain.setValueAtTime(1, audioContext.currentTime);
+            sleepNode.gain.exponentialRampToValueAtTime(0.001, audioContext.currentTime + sleepFadeSeconds);
+        }, minutes * 60000 - sleepFadeSeconds * 1000));
+
+        sleepTimeouts.push(setTimeout(function () {
+            if (isPlaying) startButton.click();
+        }, minutes * 60000));
+    }
+
+    function clearSleepTimer(resetLabel) {
+        sleepTimeouts.forEach(clearTimeout);
+        sleepTimeouts = [];
+
+        if (sleepNode && audioContext) {
+            const wasFaded = sleepNode.gain.value < 0.9;
+            sleepNode.gain.cancelScheduledValues(audioContext.currentTime);
+            // if the fade already kicked in, restore the gain after the 2s stop fade
+            sleepNode.gain.setValueAtTime(1, audioContext.currentTime + (wasFaded ? 2.5 : 0));
+        }
+
+        if (resetLabel) {
+            sleepChoiceIndex = 0;
+            sleepButton.textContent = 'timer';
+            sleepButton.classList.remove('armed');
+            sleepButton.setAttribute('aria-label', 'Sleep timer off');
+        }
+
+        resetSunset();
+    }
+
+    // while the sleep timer runs, the circle sinks like a setting sun
+    const circle = startButton.closest('.themiddle');
+
+    function startSunset(minutes) {
+        circle.style.transition = 'transform ' + (minutes * 60) + 's linear, opacity ' + (minutes * 60) + 's linear';
+        circle.getBoundingClientRect(); // flush, so the transition starts from the current position
+        circle.style.transform = 'translateZ(0) translateY(38vh)';
+        circle.style.opacity = '0.3';
+    }
+
+    function resetSunset() {
+        if (!circle.style.transform) return;
+        circle.style.transition = 'transform 2s ease-in-out, opacity 2s ease-in-out';
+        circle.style.transform = '';
+        circle.style.opacity = '';
+        setTimeout(function () { circle.style.transition = ''; }, 2100);
+    }
+
+    // ---- play along ----
+    function playableLayers() {
+        return score.layers.filter((l) => l.playable);
+    }
+
+    function layerFor(range) {
+        return score.layers.find((l) => l.playable === range);
+    }
+
+    // click or tap anywhere to drop a note
+    canvas.addEventListener('click', function (e) {
+        if (!isPlaying) return;
+
+        const layer = layerFor('high');
+        if (!layer) return;
+
+        // top-to-bottom bands, high notes at the top
+        const byPitch = layer.samples.map((s, i) => ({ s: s, i: i })).sort((a, b) => b.s.midi - a.s.midi);
         const yFraction = e.clientY / window.innerHeight;
-        const sampleIndex = bandToSample[Math.min(5, Math.floor(yFraction * 6))];
+        const band = byPitch[Math.min(byPitch.length - 1, Math.floor(yFraction * byPitch.length))];
 
         let pan = Math.max(-0.99, Math.min(0.99, (e.clientX / window.innerWidth) * 2 - 1));
         if (Math.abs(pan) < 0.02) pan = 0.02; // keep the panned (and delayed) signal path
 
-        playSample(response[sampleIndex], 0, false, pan);
-        showDrop(samplePathsSines[sampleIndex], (e.clientX / window.innerWidth) * 100, 'sine', (yFraction * 100) + '%');
+        loadLayer(layer).then(function (buffers) {
+            playBuffer(buffers[band.i], pan, false);
+            showVisual(layer, band.s, (e.clientX / window.innerWidth) * 100, (yFraction * 100) + '%');
+        });
     });
-});
 
-// ---- computer keyboard notes ----
-const keyboardSineKeys = { 'a': 1, 's': 2, 'd': 3, 'f': 4, 'g': 0, 'h': 5 }; // d4 e4 f4 gsharp4 b4 d5
-const keyboardPianoKeys = { 'z': 2, 'x': 3, 'c': 4, 'v': 0, 'b': 1 }; // d2 e2 gsharp2 a2 b2
+    // computer keyboard
+    document.addEventListener('keydown', function (e) {
+        if (!isPlaying || e.repeat || e.metaKey || e.ctrlKey || e.altKey) return;
+        if (e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA')) return;
 
-$(document).on('keydown', function (e) {
-    if (!isPlaying || e.repeat || e.metaKey || e.ctrlKey || e.altKey) return;
-    if (e.target && (e.target.tagName == 'INPUT' || e.target.tagName == 'TEXTAREA')) return;
+        const key = e.key.toLowerCase();
 
-    const key = e.key.toLowerCase();
-    let paths, sampleIndex, type;
+        for (const layer of playableLayers()) {
+            const index = layer.samples.findIndex((s) => s.key === key);
+            if (index === -1) continue;
 
-    if (key in keyboardSineKeys) {
-        paths = samplePathsSines;
-        sampleIndex = keyboardSineKeys[key];
-        type = 'sine';
-    } else if (key in keyboardPianoKeys) {
-        paths = samplePathsPiano;
-        sampleIndex = keyboardPianoKeys[key];
-        type = 'piano';
-    } else {
-        return;
-    }
-
-    setupSamples(paths).then(function (response) {
-        let pan = (Math.random() * 1.6) - 0.8;
-        if (Math.abs(pan) < 0.02) pan = 0.02;
-        playSample(response[sampleIndex], 0, false, pan);
-        showDrop(paths[sampleIndex], (pan + 1) * 50, type);
-    });
-});
-
-// ---- web midi ----
-// root notes of the samples, so any midi note can be pitched from the nearest one
-const sineRootNotes = [
-    { index: 0, midi: 71 }, // b4
-    { index: 1, midi: 62 }, // d4
-    { index: 2, midi: 64 }, // e4
-    { index: 3, midi: 65 }, // f4
-    { index: 4, midi: 68 }, // gsharp4
-    { index: 5, midi: 74 }  // d5
-];
-const pianoRootNotes = [
-    { index: 0, midi: 45 }, // a2
-    { index: 1, midi: 47 }, // b2
-    { index: 2, midi: 38 }, // d2
-    { index: 3, midi: 40 }, // e2
-    { index: 4, midi: 44 }  // gsharp2
-];
-
-$('.midilink').on('click', function () {
-    connectMidi();
-    return false;
-});
-
-// reconnect silently when access was granted in an earlier visit
-try {
-    if (navigator.permissions && navigator.requestMIDIAccess) {
-        navigator.permissions.query({ name: 'midi' }).then(function (status) {
-            if (status.state == 'granted') connectMidi();
-        }).catch(function () { });
-    }
-} catch (e) { }
-
-function connectMidi() {
-    if (!navigator.requestMIDIAccess) {
-        $('.midilink').text('no midi');
-        return;
-    }
-
-    navigator.requestMIDIAccess().then(function (access) {
-        function attachInputs() {
-            let inputCount = 0;
-            access.inputs.forEach(function (input) {
-                input.onmidimessage = onMidiMessage;
-                inputCount++;
+            loadLayer(layer).then(function (buffers) {
+                let pan = (Math.random() * 1.6) - 0.8;
+                if (Math.abs(pan) < 0.02) pan = 0.02;
+                playBuffer(buffers[index], pan, false);
+                showVisual(layer, layer.samples[index], (pan + 1) * 50);
             });
-            $('.midilink').text(inputCount > 0 ? 'midi ✓' : 'no midi').toggleClass('connected', inputCount > 0);
+            return;
         }
-
-        access.onstatechange = attachInputs;
-        attachInputs();
-    }, function () {
-        $('.midilink').text('no midi');
     });
-}
 
-function onMidiMessage(message) {
-    const command = message.data[0] & 0xf0;
-    const note = message.data[1];
-    const velocity = message.data[2];
+    // ---- web midi ----
+    const midiButton = $('.midilink');
 
-    if (command == 0x90 && velocity > 0) {
-        playMidiNote(note, velocity);
+    midiButton.addEventListener('click', connectMidi);
+
+    // reconnect silently when access was granted in an earlier visit
+    try {
+        if (navigator.permissions && navigator.requestMIDIAccess) {
+            navigator.permissions.query({ name: 'midi' })
+                .then(function (status) { if (status.state === 'granted') connectMidi(); })
+                .catch(function () { });
+        }
+    } catch (e) { /* permissions.query rejects on browsers without midi */ }
+
+    function connectMidi() {
+        if (!navigator.requestMIDIAccess) {
+            midiButton.textContent = 'no midi';
+            return;
+        }
+
+        navigator.requestMIDIAccess().then(function (access) {
+            function attachInputs() {
+                let inputCount = 0;
+                access.inputs.forEach(function (input) {
+                    input.onmidimessage = onMidiMessage;
+                    inputCount++;
+                });
+                midiButton.textContent = inputCount > 0 ? 'midi ✓' : 'no midi';
+                midiButton.classList.toggle('connected', inputCount > 0);
+            }
+
+            access.onstatechange = attachInputs;
+            attachInputs();
+        }, function () {
+            midiButton.textContent = 'no midi';
+        });
     }
-}
 
-function playMidiNote(noteNumber, velocity) {
-    if (!isPlaying) return;
-
-    const useLowSet = noteNumber < 55;
-    const roots = useLowSet ? pianoRootNotes : sineRootNotes;
-    const paths = useLowSet ? samplePathsPiano : samplePathsSines;
-
-    let nearest = roots[0];
-    for (const root of roots) {
-        if (Math.abs(root.midi - noteNumber) < Math.abs(nearest.midi - noteNumber)) {
-            nearest = root;
+    function onMidiMessage(message) {
+        if ((message.data[0] & 0xf0) === 0x90 && message.data[2] > 0) {
+            playMidiNote(message.data[1], message.data[2]);
         }
     }
 
-    setupSamples(paths).then(function (response) {
-        const source = audioContext.createBufferSource();
-        source.buffer = response[nearest.index];
-        source.playbackRate.value = Math.pow(2, (noteNumber - nearest.midi) / 12);
+    function playMidiNote(noteNumber, velocity) {
+        if (!isPlaying) return;
 
-        const velocityGain = audioContext.createGain();
-        velocityGain.gain.value = velocity / 127;
+        const layer = layerFor(noteNumber < 55 ? 'low' : 'high');
+        if (!layer) return;
 
-        const panNode = audioContext.createStereoPanner();
-        const pan = (Math.random() * 1.2) - 0.6;
-        panNode.pan.value = pan;
+        // pitch the nearest sample to the requested note
+        let nearest = 0;
+        layer.samples.forEach(function (sample, i) {
+            if (Math.abs(sample.midi - noteNumber) < Math.abs(layer.samples[nearest].midi - noteNumber)) nearest = i;
+        });
 
-        source.connect(velocityGain);
-        velocityGain.connect(panNode);
-        panNode.connect(gainNode);
-        panNode.connect(masterDelayNode);
-        source.start(0);
+        loadLayer(layer).then(function (buffers) {
+            const source = audioContext.createBufferSource();
+            source.buffer = buffers[nearest];
+            source.playbackRate.value = Math.pow(2, (noteNumber - layer.samples[nearest].midi) / 12);
 
-        // drop where the pitch sits: high notes near the top
-        const yPercent = Math.max(5, Math.min(95, 100 - ((noteNumber - 30) / 60) * 100));
-        showDrop(paths[nearest.index], (pan + 1) * 50, useLowSet ? 'piano' : 'sine', useLowSet ? undefined : yPercent + '%');
+            const velocityGain = audioContext.createGain();
+            velocityGain.gain.value = velocity / 127;
+
+            const panNode = audioContext.createStereoPanner();
+            const pan = (Math.random() * 1.2) - 0.6;
+            panNode.pan.value = pan;
+
+            source.connect(velocityGain);
+            velocityGain.connect(panNode);
+            panNode.connect(gainNode);
+            panNode.connect(delayNode);
+            source.start(0);
+
+            // drop where the pitch sits: high notes near the top
+            const y = Math.max(5, Math.min(95, 100 - ((noteNumber - 30) / 60) * 100));
+            showVisual(layer, layer.samples[nearest], (pan + 1) * 50, y + '%');
+        });
+    }
+
+    // ---- pointer glow, hints that clicking plays a note ----
+    let cursorGlow;
+
+    if (!reducedMotion && finePointer) {
+        document.addEventListener('mousemove', function (e) {
+            if (!cursorGlow) {
+                cursorGlow = document.createElement('div');
+                cursorGlow.className = 'cursorglow';
+                cursorGlow.setAttribute('aria-hidden', 'true');
+                document.body.appendChild(cursorGlow);
+            }
+
+            cursorGlow.style.transform = 'translate(' + (e.clientX - 22) + 'px, ' + (e.clientY - 22) + 'px)';
+        });
+    }
+
+    // ---- about panel ----
+    const infoButton = $('.openinfo');
+    const infoContainer = $('.infocontainer');
+    const info = $('.info');
+
+    infoButton.addEventListener('click', function () {
+        const opening = info.classList.contains('hidden');
+
+        if (opening) {
+            infoContainer.hidden = false;
+            info.classList.remove('hidden');
+        } else {
+            info.classList.add('hidden');
+            setTimeout(function () { infoContainer.hidden = true; }, 1000);
+        }
+
+        infoButton.setAttribute('aria-expanded', String(opening));
     });
-}
 
-// soft glow following the pointer, hints that clicking drops a note
-const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-const finePointer = window.matchMedia('(pointer: fine)').matches;
-let cursorGlow;
+    // ---- sharing ----
+    const shareButton = $('.share');
 
-$(document).on('mousemove', function (e) {
-    if (reducedMotion || !finePointer) return;
+    shareButton.addEventListener('click', function () {
+        const timetext = elapsedString();
+        const shareUrl = 'https://infiniteafternoon.com/?afternoon=' + seed.toString(36);
+        const copyText = timetext.length === 0
+            ? 'I am almost listening to ' + shareUrl
+            : 'I listened to ' + shareUrl + ' for ' + timetext + '. That exact afternoon is in the link.';
 
-    if (!cursorGlow) {
-        cursorGlow = $('<div class="cursorglow"></div>').appendTo('body');
-    }
+        shareButton.classList.add('copied');
+        navigator.clipboard.writeText(copyText);
 
-    cursorGlow.css('transform', 'translate(' + (e.clientX - 22) + 'px, ' + (e.clientY - 22) + 'px)');
-});
-
-if ('serviceWorker' in navigator) {
-    window.addEventListener('load', function () {
-        navigator.serviceWorker.register('/sw.js');
+        setTimeout(function () { shareButton.classList.remove('copied'); }, 5000);
     });
-}
 
-$('#stop').on('click', function () {
-    gainNode.gain.exponentialRampToValueAtTime(1, audioContext.currentTime);
-    gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 2);
+    // ---- elapsed time and dusk ----
+    function elapsedString() {
+        if (!startTime) return '';
 
-    setTimeout(function () {
-        for (let i = 0; i < nowPlaying.length; i++) {
-            nowPlaying[i].stop()
-        }
-    }, 4000);
-});
+        let elapsed = Math.floor((new Date() - startTime) / 1000 / 60);
+        const minutes = Math.round(elapsed % 60);
+        const hours = Math.round(Math.floor(elapsed / 60) % 24);
 
-function customInterval(callback, interval, isFirst, customDelta) {
-    // fast forward first loop... 
-    let thisDeltaTimewarp = deltaTimeWarp;
+        let text = '';
+        if (hours === 1) text += '1 hour';
+        else if (hours > 1) text += hours + ' hours';
 
-    if (customDelta)
-        thisDeltaTimewarp = customDelta;
+        if (hours > 0 && minutes > 0) text += ' and ';
 
-    let tempInterval = interval;
-    if (isFirst) {
-        tempInterval -= thisDeltaTimewarp;
-        // if the interval is now before our start, do original interval, minus the difference
-        if (tempInterval < 0) {
-            let delta = interval - thisDeltaTimewarp;
-            tempInterval = (interval  - Math.abs(delta));
-        }
+        if (minutes === 0 && hours === 0) text += 'under a minute';
+        else if (minutes === 1) text += '1 minute';
+        else if (minutes > 1) text += minutes + ' minutes';
 
-        console.log('temp interval: ' + tempInterval + ' interval:' + interval);
-    }
-    
-    var timeout = setTimeout(function () {
-        pendingTimeouts.delete(timeout);
-        if (isPlaying) {
-            callback();
-            customInterval(callback, interval, false);
-        }
-    }, Math.abs(tempInterval));
-
-    pendingTimeouts.add(timeout);
-}
-
-async function getFile(path) {
-    // decoded buffers are cached, so pause/resume does not re-download or re-decode
-    if (bufferCache.has(path)) {
-        return bufferCache.get(path);
+        return text;
     }
 
-    const response = await fetch(path);
-    const arrayBuffer = await response.arrayBuffer();
-    const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
-    console.log('loaded file: ' + path);
-    bufferCache.set(path, audioBuffer);
-    return audioBuffer;
-}
+    function tickElapsed() {
+        const timetext = elapsedString();
+        $('.time').textContent = timetext.length > 0 ? 'listened for ' + timetext : '';
 
-function setupSamples(paths) {
-    // load all samples of a group in parallel
-    return Promise.all(paths.map(getFile));
-}
+        // dusk creeps in the longer the afternoon lasts
+        const elapsedMinutes = (new Date() - startTime) / 60000;
+        $('.dusk').style.opacity = Math.min(0.8, elapsedMinutes / 75);
 
-function randomIntFromInterval(min, max, type, isDeep) {
-    var randomNumber = Math.floor(intervalRng() * (max - min + 1) + min)
+        setTimeout(tickElapsed, 5000);
+    }
 
-    if (type == 'sine') {
-        // check if note is not too close to others
-        for (let i = 0; i < randomSineIntervals.length; i++) {
-            if (Math.abs(randomSineIntervals[i] - randomNumber) < 500) {
-                console.log('rechoosing random... diff was ' + Math.abs(randomSineIntervals[i] - randomNumber));
-                randomNumber = randomIntFromInterval(min, max, type, true);
-            }
+    // ---- os media controls ----
+    function updateMediaSession(playing) {
+        if (!('mediaSession' in navigator)) return;
+
+        if (!navigator.mediaSession.metadata) {
+            navigator.mediaSession.metadata = new MediaMetadata({
+                title: 'Infinite Afternoon',
+                artist: 'Erwin van Kester',
+                album: 'infiniteafternoon.com',
+                artwork: [
+                    { src: '/img/icon-192.png', sizes: '192x192', type: 'image/png' },
+                    { src: '/img/icon-512.png', sizes: '512x512', type: 'image/png' }
+                ]
+            });
+
+            const toggle = function () { startButton.click(); };
+            navigator.mediaSession.setActionHandler('play', function () { if (!isPlaying) toggle(); });
+            navigator.mediaSession.setActionHandler('pause', function () { if (isPlaying) toggle(); });
+            navigator.mediaSession.setActionHandler('stop', function () { if (isPlaying) toggle(); });
         }
 
-        if (!isDeep)
-            randomSineIntervals.push(randomNumber);
-    }
-    else if (type == 'piano') {
-        // check if note is not too close to others
-        for (let i = 0; i < randomPianoIntervals.length; i++) {
-            if (Math.abs(randomPianoIntervals[i] - randomNumber) < 8000) {
-                console.log('rechoosing random... diff was ' + Math.abs(randomPianoIntervals[i] - randomNumber));
-                randomNumber = randomIntFromInterval(min, max, type, true);
-            }
-        }
-
-        if (!isDeep)
-            randomPianoIntervals.push(randomNumber);
-    }
-    else if (type == 'fx') {
-        // want fx at least 10 seconds apart initially
-        for (let i = 0; i < randomFxIntervals.length; i++) {
-            if (Math.abs(randomFxIntervals[i] - randomNumber) < 10000) {
-                console.log('rechoosing random... diff was ' + Math.abs(randomFxIntervals[i] - randomNumber));
-                randomNumber = randomIntFromInterval(min, max, type, true);
-            }
-        }
-
-        if (!isDeep)
-            randomFxIntervals.push(randomNumber);
+        navigator.mediaSession.playbackState = playing ? 'playing' : 'paused';
     }
 
-    return randomNumber;
-}
-
-function playSample(audioBuffer, time, loop, panVal) {
-    const sampleSource = audioContext.createBufferSource();
-    sampleSource.buffer = audioBuffer;
-    sampleSource.loop = loop;
-
-    if (panVal) {
-        let panNode = audioContext.createStereoPanner();
-        panNode.pan.setValueAtTime(panVal, audioContext.currentTime);
-        //console.log('panning to ' + panVal);
-        sampleSource.connect(panNode);
-        panNode.connect(gainNode);
-        panNode.connect(masterDelayNode);
-    } else {
-        sampleSource.connect(gainNode);
+    if ('serviceWorker' in navigator) {
+        window.addEventListener('load', function () { navigator.serviceWorker.register('/sw.js'); });
     }
 
-    sampleSource.start(time);
-
-    //console.log('sample started and connected to gain node');
-    if (loop)
-        nowPlaying.push(sampleSource);
-
-    return sampleSource;
-}
-
-function showBaseNote(sampleName) {
-    var yValue = '50';
-    var sampleName = sampleName.replace('/audio/drone-loop-', '').replace('.mp3', '');
-
-    for (var i = 0; i < loopYPositions.length; i++) {
-        if (loopYPositions[i].name == sampleName) {
-            yValue = loopYPositions[i].yval;
-        }
-    }
-
-    $('.dropscanvas').append('<div data-sample="' + sampleName + '" class="note" style="top: ' + yValue + '"></div>');
-
-    setTimeout(function () {
-        $('.note[data-sample="' + sampleName + '"]').remove();
-    }, 14000);
-}
-
-function showDrop(sampleName, xValue, type, yOverride) {
-    if (type == 'piano') {
-        var yValue = '50%';
-        sampleName = sampleName.replace('/audio/piano-', 'p').replace('.mp3', '');
-
-        for (var i = 0; i < pianoDropYPositions.length; i++) {
-            if (pianoDropYPositions[i].name == sampleName) {
-                yValue = pianoDropYPositions[i].yval;
-            }
-        }
-
-        $('.dropscanvas').append('<div data-sample="' + sampleName + '" class="drop piano" style="top: ' + yValue + '; left: ' + xValue + '%"></div>');
-
-        setTimeout(function () {
-            $('.drop[data-sample="' + sampleName + '"]').remove();
-        }, 15200);
-    } else {
-        var yValue = '50%';
-        sampleName = sampleName.replace('/audio/sine-', '').replace('.mp3', '');
-
-        for (var i = 0; i < sineDropYPositions.length; i++) {
-            if (sineDropYPositions[i].name == sampleName) {
-                yValue = sineDropYPositions[i].yval;
-            }
-        }
-
-        if (yOverride) {
-            yValue = yOverride;
-        }
-
-        $('.dropscanvas').append('<div data-sample="' + sampleName + '" class="drop" style="top: ' + yValue + '; left: ' + xValue + '%"></div>');
-
-        setTimeout(function () {
-            $('.drop[data-sample="' + sampleName + '"]').remove();
-        }, 15200);
-    }
-}
-
-$('.openinfo').on('click', function () {
-    if ($('.info').hasClass('hidden')) {
-        $('.infocontainer').show();
-        $('.info').removeClass('hidden');
-    } else {
-        $('.info').addClass('hidden');
-        setTimeout(function () {
-            $('.infocontainer').hide();
-        }, 1000);
-    }
-    return false;
-});
-
-$('.share').on('click', function () {
-    copyShareText();
-});
-
-function copyShareText() {
-    // Get the text field
-    var timetext = getTimeString();
-    var shareUrl = 'https://infiniteafternoon.com/?afternoon=' + seed.toString(36);
-    let copyText = '';
-    if (timetext.length == 0) {
-        copyText = 'I am almost listening to ' + shareUrl;
-    } else {
-        copyText = 'I listened to ' + shareUrl + ' for ' + timetext + '. That exact afternoon is in the link.';
-    }
-
-    $('.share').addClass('copied');
-    navigator.clipboard.writeText(copyText);
-
-    setTimeout(function () {
-        $('.share').removeClass('copied');
-    }, 5000)
-}
-
-function displayTimeElapsed() {
-    var endTime = new Date();
-    var timeDiff = endTime - startTime;
-    timeDiff /= 1000;
-
-    // remove seconds from the date
-    timeDiff = Math.floor(timeDiff / 60);
-
-    // get minutes
-    var minutes = Math.round(timeDiff % 60);
-
-    // remove minutes from the date
-    timeDiff = Math.floor(timeDiff / 60);
-
-    // get hours
-    var hours = Math.round(timeDiff % 24);
-    var timetext = getTimeString();
-
-    if (timetext.length > 0) {
-        var timetext = 'listened for ' + timetext;
-    }
-
-    $('.time').text(timetext);
-
-    // dusk creeps in the longer the afternoon lasts (fully there around 60 min)
-    var elapsedMinutes = (endTime - startTime) / 60000;
-    document.querySelector('.dusk').style.opacity = Math.min(.8, elapsedMinutes / 75);
-
-    setTimeout(displayTimeElapsed, 5000);
-}
-
-function getTimeString() {
-    var endTime = new Date();
-    var timeDiff = endTime - startTime;
-    timeDiff /= 1000;
-
-    // remove seconds from the date
-    timeDiff = Math.floor(timeDiff / 60);
-
-    // get minutes
-    var minutes = Math.round(timeDiff % 60);
-
-    // remove minutes from the date
-    timeDiff = Math.floor(timeDiff / 60);
-
-    // get hours
-    var hours = Math.round(timeDiff % 24);
-
-    var timetext = '';
-    if (hours == 1) {
-        timetext += '1 hour';
-    } else if (hours > 1) {
-        timetext += (hours + ' hours');
-    }
-
-    if (hours > 0 && minutes > 0) {
-        timetext += ' and ';
-    }
-
-    if (minutes == 0 && hours == 0) {
-        timetext += 'under a minute';
-    } else if (minutes == 1) {
-        timetext += '1 minute';
-    } else if (minutes > 1) {
-        timetext += (minutes + ' minutes');
-    }
-
-    return timetext;
-}
+    // small surface for debugging in the console
+    window.afternoon = {
+        get seed() { return seed; },
+        get score() { return score; },
+        get isPlaying() { return isPlaying; },
+        get energy() { return smoothedEnergy; },
+        get pending() { return pendingTimeouts.size; },
+        get cached() { return bufferCache.size; },
+        get state() { return audioContext ? audioContext.state : 'none'; },
+        get schedule() { return lastPlans; },
+        get time() { return audioContext ? +audioContext.currentTime.toFixed(2) : 0; },
+        playMidiNote: playMidiNote
+    };
+})();

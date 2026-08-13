@@ -30,6 +30,16 @@ app.UseStaticFiles(new StaticFileOptions
 {
     OnPrepareResponse = ctx =>
     {
+        var path = ctx.File.Name;
+
+        // the score is the composition: it must never be stale, so revalidate
+        // every time. sw.js likewise, or a new worker would never take over.
+        if (path.EndsWith(".json", StringComparison.OrdinalIgnoreCase) || path == "sw.js")
+        {
+            ctx.Context.Response.Headers.CacheControl = "no-cache";
+            return;
+        }
+
         // css/js links use asp-append-version, audio/fonts rarely change
         ctx.Context.Response.Headers.CacheControl = "public,max-age=604800";
     }

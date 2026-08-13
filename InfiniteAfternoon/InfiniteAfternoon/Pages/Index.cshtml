@@ -1,28 +1,28 @@
-﻿@page
-@model Portfolio.Pages.AnyAfternoonModel
+@page
+@model InfiniteAfternoon.Pages.IndexModel
 
-<div id="titlecontainer">
+<div id="titlecontainer" aria-hidden="true">
     <h1>Infinite <br /> Afternoon</h1>
 </div>
 
-<div class="dropscanvas">
+<div class="dropscanvas" aria-hidden="true">
 
 </div>
 
-<div class="themiddle second"></div>
-<div class="themiddle third"></div>
+<div class="themiddle second" aria-hidden="true"></div>
+<div class="themiddle third" aria-hidden="true"></div>
 
 <div class="themiddle">
-    <button id="start"></button>
-    <input id="volumecontrol" type="range" min="0" max="110" step="1" value="100" />
+    <button id="start" type="button" aria-label="Play"></button>
+    <input id="volumecontrol" type="range" min="0" max="110" step="1" value="100" aria-label="Volume" />
 
-    <a href="#" class="openinfo">about</a>
-    <a href="#" class="sleeptimer" title="sleep timer">timer</a>
-    <a href="#" class="midilink" title="play along with a midi keyboard">midi</a>
+    <button type="button" class="openinfo" aria-expanded="false" aria-controls="about">about</button>
+    <button type="button" class="sleeptimer" aria-label="Sleep timer off">timer</button>
+    <button type="button" class="midilink" aria-label="Play along with a MIDI keyboard">midi</button>
 
-    <div class="infocontainer" style="display: none;">
-        <div class="info hidden">
-            <p class="d-block d-sm-none">When listening on a phone, please unmute your device.</p>
+    <div class="infocontainer" hidden>
+        <div class="info hidden" id="about">
+            <p class="phonehint">When listening on a phone, please unmute your device.</p>
 
             <h2>infinite afternoon</h2>
             <h6>What is Infinite Afternoon?</h6>
@@ -32,14 +32,14 @@
 
             <h6>What techniques are used to make Infinite Afternoon?</h6>
             <p>I have created the samples with Ableton Live.</p>
-            <p>The page is created with HTML/CSS and JavaScript/jQuery. In JavaScript I use the Web Audio API to play and manipulate the audio files.</p>
+            <p>The page is created with HTML/CSS and JavaScript. In JavaScript I use the Web Audio API to play and manipulate the audio files.</p>
             <p>The 'drops' you see are aligned with the panning of the notes.</p>
 
             <h6>Is Infinite Afternoon using AI-generated music?</h6>
             <p>No. All sounds were created by me, and the timing is done based on rules. Claude did help with some of the programming.</p>
 
             <h6>Can I play along?</h6>
-            <p>Yes! Click or tap anywhere to drop a note. On a keyboard, A&ndash;H play the high notes and Z&ndash;B the low piano notes. You can even plug in a MIDI keyboard and enable it with the 'midi' link &mdash; every key is pitched from the original samples.</p>
+            <p>Yes! Click or tap anywhere to drop a note. On a keyboard, A&ndash;H play the high notes and Z&ndash;B the low piano notes. You can even plug in a MIDI keyboard and enable it with the 'midi' button &mdash; every key is pitched from the original samples.</p>
 
             <h6>Can I get in contact?</h6>
             <p>Email me at <a href="mailto:afternoon@erwinvk.nl">afternoon@erwinvk.nl</a> for anything! Maybe we can team up to make something great. Or maybe you have an idea, or something is not working correctly. Let me know!</p>
@@ -49,9 +49,9 @@
     </div>
 </div>
 
-<div class="dusk"></div>
+<div class="dusk" aria-hidden="true"></div>
 
-<div class="wavescontainer">
+<div class="wavescontainer" aria-hidden="true">
     <svg class="waves" xmlns="http://www.w3.org/2000/svg" viewBox="0 24 150 28" preserveAspectRatio="none">
         <defs>
             <path id="gentle-wave" d="M-160 44c30 0 58-18 88-18s58 18 88 18 58-18 88-18 58 18 88 18 v44h-352z" />
@@ -65,5 +65,5 @@
     </svg>
 </div>
 
-<div class="time"></div><a href="#" class="share"><svg xmlns="http://www.w3.org/2000/svg" height="24" viewBox="0 0 24 24" width="24"><path fill="#AECFDFCC" d="M18 16.08c-.76 0-1.44.3-1.96.77L8.91 12.7c.05-.23.09-.46.09-.7s-.04-.47-.09-.7l7.05-4.11c.54.5 1.25.81 2.04.81 1.66 0 3-1.34 3-3s-1.34-3-3-3-3 1.34-3 3c0 .24.04.47.09.7L8.04 9.81C7.5 9.31 6.79 9 6 9c-1.66 0-3 1.34-3 3s1.34 3 3 3c.79 0 1.5-.31 2.04-.81l7.12 4.16c-.05.21-.08.43-.08.65 0 1.61 1.31 2.92 2.92 2.92s2.92-1.31 2.92-2.92c0-1.61-1.31-2.92-2.92-2.92zM18 4c.55 0 1 .45 1 1s-.45 1-1 1-1-.45-1-1 .45-1 1-1zM6 13c-.55 0-1-.45-1-1s.45-1 1-1 1 .45 1 1-.45 1-1 1zm12 7.02c-.55 0-1-.45-1-1s.45-1 1-1 1 .45 1 1-.45 1-1 1z"></path></svg></a>
-<div class="noise"></div>
+<div class="time" aria-live="polite"></div><button type="button" class="share" aria-label="Copy a link to this afternoon"><svg xmlns="http://www.w3.org/2000/svg" height="24" viewBox="0 0 24 24" width="24" aria-hidden="true" focusable="false"><path fill="#AECFDFCC" d="M18 16.08c-.76 0-1.44.3-1.96.77L8.91 12.7c.05-.23.09-.46.09-.7s-.04-.47-.09-.7l7.05-4.11c.54.5 1.25.81 2.04.81 1.66 0 3-1.34 3-3s-1.34-3-3-3-3 1.34-3 3c0 .24.04.47.09.7L8.04 9.81C7.5 9.31 6.79 9 6 9c-1.66 0-3 1.34-3 3s1.34 3 3 3c.79 0 1.5-.31 2.04-.81l7.12 4.16c-.05.21-.08.43-.08.65 0 1.61 1.31 2.92 2.92 2.92s2.92-1.31 2.92-2.92c0-1.61-1.31-2.92-2.92-2.92zM18 4c.55 0 1 .45 1 1s-.45 1-1 1-1-.45-1-1 .45-1 1-1zM6 13c-.55 0-1-.45-1-1s.45-1 1-1 1 .45 1 1-.45 1-1 1zm12 7.02c-.55 0-1-.45-1-1s.45-1 1-1 1 .45 1 1-.45 1-1 1z"></path></svg></button>
+<div class="noise" aria-hidden="true"></div>

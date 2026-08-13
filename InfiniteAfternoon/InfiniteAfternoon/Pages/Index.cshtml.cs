@@ -1,9 +1,8 @@
-using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 
-namespace Portfolio.Pages
+namespace InfiniteAfternoon.Pages
 {
-    public class AnyAfternoonModel : PageModel
+    public class IndexModel : PageModel
     {
         public void OnGet()
         {

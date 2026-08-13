@@ -41,11 +41,8 @@
     <meta name="theme-color" content="#191919" />
     <link rel="apple-touch-icon" href="~/img/icon-192.png" />
 
-    <link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap.min.css" />
-    <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
+    <link rel="preload" href="~/fonts/staatliches-v11-latin-regular.woff2" as="font" type="font/woff2" crossorigin />
     <link rel="stylesheet" href="~/css/afternoon.css" asp-append-version="true" />
-    <style>
-    </style>
 </head>
 <body>
     <!-- Google tag (gtag.js) -->
@@ -62,8 +59,7 @@
         KESTER
     </a>
 
-    <script src="~/lib/jquery/dist/jquery.min.js"></script>
-    <script src="~/js/site.js" asp-append-version="true"></script>
+    <script src="~/js/site.js" asp-append-version="true" defer></script>
 
     @await RenderSectionAsync("Scripts", required: false)
 </body>

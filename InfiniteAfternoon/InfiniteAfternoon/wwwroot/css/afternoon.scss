@@ -7,14 +7,88 @@ $lightAltColor10: #AECFDF11;
 @font-face {
     font-family: 'Staatliches';
     src: url('/fonts/staatliches-v11-latin-regular.woff2') format('woff2');
+    font-display: swap;
+}
+
+@font-face {
+    font-family: 'Open Sans';
+    font-style: normal;
+    font-weight: 400;
+    src: url('/fonts/open-sans-v34-latin-regular.woff2') format('woff2');
+    font-display: swap;
+}
+
+@font-face {
+    font-family: 'Open Sans';
+    font-style: normal;
+    font-weight: 700;
+    src: url('/fonts/open-sans-v34-latin-700.woff2') format('woff2');
+    font-display: swap;
+}
+
+@font-face {
+    font-family: 'Open Sans';
+    font-style: italic;
+    font-weight: 400;
+    src: url('/fonts/open-sans-v34-latin-italic.woff2') format('woff2');
+    font-display: swap;
+}
+
+// minimal reset — replaces the parts of bootstrap's reboot the layout relied on
+*,
+*::before,
+*::after {
+    box-sizing: border-box;
+}
+
+body {
+    margin: 0;
+}
+
+h1, h2, h3, h4, h5, h6, p {
+    margin-top: 0;
+    margin-bottom: .5rem;
+}
+
+p {
+    margin-bottom: 1rem;
+}
+
+html {
+    font-size: 16px;
 }
 
 h1, h2, h3 {
     font-family: 'Staatliches';
 }
 
+h2 {
+    font-size: 4em;
+}
+
 body {
+    font-family: 'Open Sans', sans-serif;
+    color: #333;
     background: #191919;
+}
+
+// the three controls under the circle are buttons, not links
+.openinfo,
+.sleeptimer,
+.midilink,
+.share {
+    padding: 0;
+    border: 0;
+    background: none;
+    cursor: pointer;
+}
+
+.phonehint {
+    display: none;
+
+    @media (max-width: 575px) {
+        display: block;
+    }
 }
 
 a {
@@ -427,11 +501,11 @@ button {
         border-radius: 3px;
     }
 
-    // .themiddle (this panel's positioning parent) is exactly viewport-centered,
-    // its padding box is 240x240, so offsets from 120px land on the viewport center
+    // .themiddle (this panel's positioning parent) is exactly viewport-centered
+    // and 200x200, so offsets from 100px land on the viewport centre
     @media (max-width: 600px) {
-        top: calc(-40vh + 120px);
-        left: calc(120px - 45vw);
+        top: calc(100px - 40vh);
+        left: calc(100px - 45vw);
         width: 90vw;
         max-height: 80vh;
         overflow-y: auto;

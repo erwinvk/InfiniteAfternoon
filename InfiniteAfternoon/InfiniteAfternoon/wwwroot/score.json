@@ -1,0 +1,112 @@
+{
+  "title": "Infinite Afternoon",
+  "audioBase": "/audio/",
+
+  "_comment": [
+    "The composition lives here, not in the code. site.js is only the player.",
+    "Each layer names its samples and how they are scheduled and drawn.",
+    "  mode 'retrigger' : restart every 'every' ms, staggered per sample.",
+    "  mode 'random'    : each sample gets its own interval drawn once from",
+    "                     'interval' [min,max]; 'minSpacing' keeps those",
+    "                     intervals apart so notes do not clump.",
+    "  pickOne          : one random sample per trigger instead of one timer each.",
+    "  warpFirst        : skip ahead on the very first trigger so the piece",
+    "                     does not open with a long silence.",
+    "Per sample: 'midi' is the real pitch (used to pitch MIDI notes from the",
+    "nearest sample), 'y' is where its drop appears, 'key' is its computer key."
+  ],
+
+  "timewarp": 25000,
+
+  "layers": [
+    {
+      "id": "drones",
+      "mode": "retrigger",
+      "every": 14000,
+      "stagger": 7700,
+      "warpFirst": 13500,
+      "visual": "band",
+      "visualDuration": 14000,
+      "_note": "samples are 19.2s but restart every 14s, so they overlap on purpose",
+      "samples": [
+        { "file": "drone-loop-e2.mp3", "id": "e2", "y": "85%" },
+        { "file": "drone-loop-b2.mp3", "id": "b2", "y": "25%" },
+        { "file": "drone-loop-a2.mp3", "id": "a2", "y": "40%" },
+        { "file": "drone-loop-f2.mp3", "id": "f2", "y": "70%" },
+        { "file": "drone-loop-gsharp2.mp3", "id": "gsharp2", "y": "55%" },
+        { "file": "drone-loop-d3.mp3", "id": "d3", "y": "15%" }
+      ]
+    },
+    {
+      "id": "sines",
+      "mode": "random",
+      "interval": [16500, 65000],
+      "minSpacing": 500,
+      "warpFirst": true,
+      "pan": true,
+      "rngOffset": 1000,
+      "visual": "drop",
+      "visualDuration": 15200,
+      "playable": "high",
+      "samples": [
+        { "file": "sine-b4.mp3", "id": "b4", "midi": 71, "y": "25%", "key": "g" },
+        { "file": "sine-d4.mp3", "id": "d4", "midi": 62, "y": "65%", "key": "a" },
+        { "file": "sine-e4.mp3", "id": "e4", "midi": 64, "y": "55%", "key": "s" },
+        { "file": "sine-f4.mp3", "id": "f4", "midi": 65, "y": "45%", "key": "d" },
+        { "file": "sine-gsharp4.mp3", "id": "gsharp4", "midi": 68, "y": "35%", "key": "f" },
+        { "file": "sine-d5.mp3", "id": "d5", "midi": 74, "y": "10%", "key": "h" }
+      ]
+    },
+    {
+      "id": "piano",
+      "mode": "random",
+      "interval": [22500, 125000],
+      "minSpacing": 8000,
+      "warpFirst": true,
+      "pan": true,
+      "rngOffset": 2000,
+      "visual": "drop",
+      "dropClass": "piano",
+      "visualDuration": 15200,
+      "playable": "low",
+      "samples": [
+        { "file": "piano-a2.mp3", "id": "pa2", "midi": 45, "y": "83%", "key": "v" },
+        { "file": "piano-b2.mp3", "id": "pb2", "midi": 47, "y": "80%", "key": "b" },
+        { "file": "piano-d2.mp3", "id": "pd2", "midi": 38, "y": "90%", "key": "z" },
+        { "file": "piano-e2.mp3", "id": "pe2", "midi": 40, "y": "95%", "key": "x" },
+        { "file": "piano-gsharp2.mp3", "id": "pgsharp2", "midi": 44, "y": "85%", "key": "c" }
+      ]
+    },
+    {
+      "id": "subs",
+      "mode": "random",
+      "interval": [60000, 300000],
+      "pickOne": true,
+      "rngOffset": 3000,
+      "visual": "subpulse",
+      "visualDuration": 12500,
+      "samples": [
+        { "file": "sub-e0.mp3", "id": "sub1" },
+        { "file": "sub-e0-2.mp3", "id": "sub2" }
+      ]
+    },
+    {
+      "id": "fx",
+      "mode": "random",
+      "interval": [45000, 900000],
+      "minSpacing": 10000,
+      "warpFirst": true,
+      "pan": true,
+      "rngOffset": 4000,
+      "visual": null,
+      "samples": [
+        { "file": "fx-birdlike.mp3", "id": "birdlike" },
+        { "file": "fx-pizzi1.mp3", "id": "pizzi1" },
+        { "file": "fx-pizzi2.mp3", "id": "pizzi2" },
+        { "file": "fx-pizzi3.mp3", "id": "pizzi3" },
+        { "file": "fx-pizzi4.mp3", "id": "pizzi4" },
+        { "file": "fx-pizzi5.mp3", "id": "pizzi5" }
+      ]
+    }
+  ]
+}
