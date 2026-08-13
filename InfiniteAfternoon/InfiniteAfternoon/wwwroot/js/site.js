@@ -738,34 +738,68 @@
         return text;
     }
 
-    // the sky turns over the length of a long listen: afternoon into dusk,
-    // dusk into night, and near the end of a four hour stretch the first
-    // cold hint of morning. each stage is one overlay whose opacity is a
-    // simple ramp, so they cross-fade into each other.
+    // The sky follows the listener's actual clock, so the page arrives already
+    // in the light of the moment and keeps turning while you listen: start at
+    // six in the evening and stay four hours, and you watch it get dark for
+    // real. Each stage is one overlay with a simple ramp, cross-fading.
     function ramp(value, from, to) {
         return Math.max(0, Math.min(1, (value - from) / (to - from)));
     }
 
-    function paintSky(minutes) {
+    // a triangle: up from 'in', full at 'peak', down to 'out'
+    function window_(hour, inAt, peak, outAt) {
+        return Math.min(ramp(hour, inAt, peak), 1 - ramp(hour, peak, outAt));
+    }
+
+    function skyAt(hour) {
+        // night is the one that wraps past midnight, so it is spelled out
+        let night;
+        if (hour >= 20.5) night = ramp(hour, 20.5, 22.5);
+        else if (hour < 4.5) night = 1;
+        else if (hour < 6.5) night = 1 - ramp(hour, 4.5, 6.5);
+        else night = 0;
+
+        return {
+            dusk: window_(hour, 16.5, 19.5, 22.5) * 0.8,   // late afternoon into evening
+            night: night * 0.85,                            // evening through to first light
+            dawn: window_(hour, 5, 6.5, 8) * 0.3            // the cold hour before the day
+        };
+    }
+
+    let skyPainted = false;
+
+    function paintSky(hourOverride) {
         const dusk = $('.dusk');
         const night = $('.night');
         const dawn = $('.dawn');
         if (!dusk) return;
 
-        // dusk arrives over the first hour and a quarter, then gives way
-        dusk.style.opacity = (ramp(minutes, 0, 75) * 0.8 - ramp(minutes, 75, 150) * 0.55).toFixed(3);
-        // night settles in behind it
-        night.style.opacity = (ramp(minutes, 60, 165) * 0.85).toFixed(3);
-        // and after about three hours, the first cold light
-        dawn.style.opacity = (ramp(minutes, 190, 260) * 0.3).toFixed(3);
+        const now = new Date();
+        const hour = hourOverride === undefined ? now.getHours() + now.getMinutes() / 60 : hourOverride;
+        const sky = skyAt(hour);
+
+        // the first paint is the world as it already is, not a 60s fade into it
+        if (!skyPainted) {
+            skyPainted = true;
+            [dusk, night, dawn].forEach(function (el) { el.style.transition = 'none'; });
+            dusk.getBoundingClientRect();
+            setTimeout(function () {
+                [dusk, night, dawn].forEach(function (el) { el.style.transition = ''; });
+            }, 50);
+        }
+
+        dusk.style.opacity = sky.dusk.toFixed(3);
+        night.style.opacity = sky.night.toFixed(3);
+        dawn.style.opacity = sky.dawn.toFixed(3);
     }
+
+    paintSky();
+    setInterval(function () { paintSky(); }, 60000);
 
     function tickElapsed() {
         const timetext = elapsedString();
         const timeEl = $('.time');
         if (timeEl) timeEl.textContent = timetext.length > 0 ? 'listened for ' + timetext : '';
-
-        paintSky((new Date() - startTime) / 60000);
 
         setTimeout(tickElapsed, 5000);
     }
@@ -808,6 +842,7 @@
         get cached() { return bufferCache.size; },
         get loaded() { return loadTotal ? loadedCount + '/' + loadTotal : 'idle'; },
         paintSky: paintSky,
+        get sky() { const n = new Date(); return skyAt(n.getHours() + n.getMinutes() / 60); },
         get state() { return audioContext ? audioContext.state : 'none'; },
         get schedule() { return lastPlans; },
         // draw one of a layer's visuals without waiting for its interval
