@@ -13,7 +13,12 @@
     "  warpFirst        : skip ahead on the very first trigger so the piece",
     "                     does not open with a long silence.",
     "Per sample: 'midi' is the real pitch (used to pitch MIDI notes from the",
-    "nearest sample), 'y' is where its drop appears, 'key' is its computer key."
+    "nearest sample), 'y' is where its drop appears, 'key' is its computer key.",
+    "",
+    "The screen reads as a score: vertical position is pitch, horizontal is",
+    "panning. Each layer owns a horizontal band and a hue, all inside the same",
+    "blue family, so you can tell the layers apart without leaving the palette.",
+    "Within a band the samples are ordered by pitch, high note = high on screen."
   ],
 
   "timewarp": 25000,
@@ -27,14 +32,16 @@
       "warpFirst": 13500,
       "visual": "band",
       "visualDuration": 14000,
+      "hue": 225,
       "_note": "samples are 19.2s but restart every 14s, so they overlap on purpose",
+      "_band": "the sustained bed sits across the middle, 48% to 75%",
       "samples": [
-        { "file": "drone-loop-e2.mp3", "id": "e2", "y": "85%" },
-        { "file": "drone-loop-b2.mp3", "id": "b2", "y": "25%" },
-        { "file": "drone-loop-a2.mp3", "id": "a2", "y": "40%" },
-        { "file": "drone-loop-f2.mp3", "id": "f2", "y": "70%" },
-        { "file": "drone-loop-gsharp2.mp3", "id": "gsharp2", "y": "55%" },
-        { "file": "drone-loop-d3.mp3", "id": "d3", "y": "15%" }
+        { "file": "drone-loop-e2.mp3", "id": "e2", "midi": 40, "y": "75%" },
+        { "file": "drone-loop-b2.mp3", "id": "b2", "midi": 47, "y": "53%" },
+        { "file": "drone-loop-a2.mp3", "id": "a2", "midi": 45, "y": "59%" },
+        { "file": "drone-loop-f2.mp3", "id": "f2", "midi": 41, "y": "70%" },
+        { "file": "drone-loop-gsharp2.mp3", "id": "gsharp2", "midi": 44, "y": "64%" },
+        { "file": "drone-loop-d3.mp3", "id": "d3", "midi": 50, "y": "48%" }
       ]
     },
     {
@@ -48,13 +55,15 @@
       "visual": "drop",
       "visualDuration": 15200,
       "playable": "high",
+      "hue": 200,
+      "_band": "the high voices live in the top 5% to 45%",
       "samples": [
-        { "file": "sine-b4.mp3", "id": "b4", "midi": 71, "y": "25%", "key": "g" },
-        { "file": "sine-d4.mp3", "id": "d4", "midi": 62, "y": "65%", "key": "a" },
-        { "file": "sine-e4.mp3", "id": "e4", "midi": 64, "y": "55%", "key": "s" },
-        { "file": "sine-f4.mp3", "id": "f4", "midi": 65, "y": "45%", "key": "d" },
-        { "file": "sine-gsharp4.mp3", "id": "gsharp4", "midi": 68, "y": "35%", "key": "f" },
-        { "file": "sine-d5.mp3", "id": "d5", "midi": 74, "y": "10%", "key": "h" }
+        { "file": "sine-b4.mp3", "id": "b4", "midi": 71, "y": "13%", "key": "g" },
+        { "file": "sine-d4.mp3", "id": "d4", "midi": 62, "y": "45%", "key": "a" },
+        { "file": "sine-e4.mp3", "id": "e4", "midi": 64, "y": "37%", "key": "s" },
+        { "file": "sine-f4.mp3", "id": "f4", "midi": 65, "y": "29%", "key": "d" },
+        { "file": "sine-gsharp4.mp3", "id": "gsharp4", "midi": 68, "y": "21%", "key": "f" },
+        { "file": "sine-d5.mp3", "id": "d5", "midi": 74, "y": "5%", "key": "h" }
       ]
     },
     {
@@ -69,12 +78,15 @@
       "dropClass": "piano",
       "visualDuration": 15200,
       "playable": "low",
+      "hue": 249,
+      "_band": "the low voices sit under the bed, 79% to 92%",
+      "_fixed": "e2 used to sit below d2, an octave lower note drawn higher up",
       "samples": [
-        { "file": "piano-a2.mp3", "id": "pa2", "midi": 45, "y": "83%", "key": "v" },
-        { "file": "piano-b2.mp3", "id": "pb2", "midi": 47, "y": "80%", "key": "b" },
-        { "file": "piano-d2.mp3", "id": "pd2", "midi": 38, "y": "90%", "key": "z" },
-        { "file": "piano-e2.mp3", "id": "pe2", "midi": 40, "y": "95%", "key": "x" },
-        { "file": "piano-gsharp2.mp3", "id": "pgsharp2", "midi": 44, "y": "85%", "key": "c" }
+        { "file": "piano-a2.mp3", "id": "pa2", "midi": 45, "y": "82%", "key": "v" },
+        { "file": "piano-b2.mp3", "id": "pb2", "midi": 47, "y": "79%", "key": "b" },
+        { "file": "piano-d2.mp3", "id": "pd2", "midi": 38, "y": "92%", "key": "z" },
+        { "file": "piano-e2.mp3", "id": "pe2", "midi": 40, "y": "89%", "key": "x" },
+        { "file": "piano-gsharp2.mp3", "id": "pgsharp2", "midi": 44, "y": "86%", "key": "c" }
       ]
     },
     {
@@ -85,6 +97,8 @@
       "rngOffset": 3000,
       "visual": "subpulse",
       "visualDuration": 12500,
+      "hue": 235,
+      "_band": "lowest of all, so it rises from the very bottom edge",
       "samples": [
         { "file": "sub-e0.mp3", "id": "sub1" },
         { "file": "sub-e0-2.mp3", "id": "sub2" }
@@ -98,14 +112,17 @@
       "warpFirst": true,
       "pan": true,
       "rngOffset": 4000,
-      "visual": null,
+      "visual": "spark",
+      "visualDuration": 4000,
+      "hue": 190,
+      "_band": "no definite pitch, so these are quick sparks high in the frame",
       "samples": [
-        { "file": "fx-birdlike.mp3", "id": "birdlike" },
-        { "file": "fx-pizzi1.mp3", "id": "pizzi1" },
-        { "file": "fx-pizzi2.mp3", "id": "pizzi2" },
-        { "file": "fx-pizzi3.mp3", "id": "pizzi3" },
-        { "file": "fx-pizzi4.mp3", "id": "pizzi4" },
-        { "file": "fx-pizzi5.mp3", "id": "pizzi5" }
+        { "file": "fx-birdlike.mp3", "id": "birdlike", "y": "9%" },
+        { "file": "fx-pizzi1.mp3", "id": "pizzi1", "y": "17%" },
+        { "file": "fx-pizzi2.mp3", "id": "pizzi2", "y": "24%" },
+        { "file": "fx-pizzi3.mp3", "id": "pizzi3", "y": "31%" },
+        { "file": "fx-pizzi4.mp3", "id": "pizzi4", "y": "38%" },
+        { "file": "fx-pizzi5.mp3", "id": "pizzi5", "y": "12%" }
       ]
     }
   ]

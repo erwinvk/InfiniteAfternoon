@@ -264,11 +264,13 @@
 
     // each visual removes its own element; removing by selector would also take
     // out newer notes of the same sample
-    function addTemporary(html, lifetime) {
+    function addTemporary(html, lifetime, hue) {
         const element = document.createElement('div');
         element.className = html.className;
         if (html.style) element.setAttribute('style', html.style);
         if (html.sample) element.dataset.sample = html.sample;
+        // the layer's hue drives every colour in the element's animation
+        if (hue !== undefined) element.style.setProperty('--hue', hue);
         canvas.appendChild(element);
         setTimeout(function () { element.remove(); }, lifetime);
         return element;
@@ -277,24 +279,34 @@
     function showVisual(layer, sample, xPercent, yOverride) {
         if (!layer.visual) return;
 
+        const y = yOverride || sample.y || '50%';
+
         if (layer.visual === 'band') {
-            addTemporary({ className: 'note', sample: sample.id, style: 'top: ' + (sample.y || '50%') }, layer.visualDuration);
+            addTemporary({ className: 'note', sample: sample.id, style: 'top: ' + y }, layer.visualDuration, layer.hue);
             return;
         }
 
         if (layer.visual === 'subpulse') {
-            addTemporary({ className: 'subpulse' }, layer.visualDuration);
+            addTemporary({ className: 'subpulse' }, layer.visualDuration, layer.hue);
+            return;
+        }
+
+        if (layer.visual === 'spark') {
+            addTemporary({
+                className: 'spark',
+                sample: sample.id,
+                style: 'top: ' + y + '; left: ' + xPercent + '%'
+            }, layer.visualDuration, layer.hue);
             return;
         }
 
         if (layer.visual === 'drop') {
             const className = layer.dropClass ? 'drop ' + layer.dropClass : 'drop';
-            const y = yOverride || sample.y || '50%';
             addTemporary({
                 className: className,
                 sample: sample.id,
                 style: 'top: ' + y + '; left: ' + xPercent + '%'
-            }, layer.visualDuration);
+            }, layer.visualDuration, layer.hue);
         }
     }
 
@@ -324,6 +336,9 @@
             titleEl.style.opacity = Math.min(1, 0.7 + smoothedEnergy * 0.8);
             // shimmer: shift the title gradient with the swells of the music
             titleTextEl.style.backgroundPosition = '0 ' + (50 + smoothedEnergy * 150) + '%';
+            // the circle breathes too. a custom property, not a transform, so
+            // this never fights the sunset transition for the same property
+            circle.style.setProperty('--glow', smoothedEnergy.toFixed(3));
 
             energyFrame = requestAnimationFrame(tick);
         })();
@@ -334,6 +349,7 @@
         $('.noise').style.opacity = '';
         $('#titlecontainer').style.opacity = '';
         $('#titlecontainer h1').style.backgroundPosition = '';
+        circle.style.removeProperty('--glow');
     }
 
     // ---- transport ----
@@ -706,6 +722,15 @@
         get cached() { return bufferCache.size; },
         get state() { return audioContext ? audioContext.state : 'none'; },
         get schedule() { return lastPlans; },
+        // draw one of a layer's visuals without waiting for its interval
+        preview: function (layerId, xPercent) {
+            const layer = score.layers.find((l) => l.id === layerId);
+            if (!layer) return 'no such layer';
+            layer.samples.forEach(function (sample, i) {
+                showVisual(layer, sample, xPercent === undefined ? 20 + i * 12 : xPercent);
+            });
+            return layer.samples.length + ' ' + layer.visual;
+        },
         get time() { return audioContext ? +audioContext.currentTime.toFixed(2) : 0; },
         playMidiNote: playMidiNote
     };

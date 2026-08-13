@@ -72,7 +72,7 @@ body {
     background: #191919;
 }
 
-// the three controls under the circle are buttons, not links
+// the controls under the circle are buttons, not links
 .openinfo,
 .sleeptimer,
 .midilink,
@@ -81,6 +81,18 @@ body {
     border: 0;
     background: none;
     cursor: pointer;
+}
+
+// keyboard focus has to survive a dark, moving, blurred background
+:focus-visible {
+    outline: 2px solid $lightAltColor;
+    outline-offset: 6px;
+    border-radius: 2px;
+}
+
+#start:focus-visible {
+    outline-offset: 12px;
+    border-radius: 50%;
 }
 
 .phonehint {
@@ -120,7 +132,13 @@ input {
         display: flex;
         justify-content: center;
         font-family: 'Staatliches';
-        font-size: 20em;
+        // the crop is the point, but it has to be the same crop everywhere.
+        // 'Afternoon' measures 4.13x the font size, so 32vw bleeds it ~32%
+        // past the edges on a phone and on a desktop alike — close to how it
+        // read on a laptop before, when it was a fixed 320px: 27% over on this
+        // screen, 3% on a wide one and 253% on a phone. turn this one dial to
+        // taste; it is the whole crop.
+        font-size: clamp(4rem, 32vw, 36rem);
         text-align: center;
         max-width: 100%;
         margin-top: 1%;
@@ -176,7 +194,9 @@ input {
     height: 200%;
     background-image: url( data:image/png;base64,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 );
     background-repeat: repeat;
-    animation: noiseFX 2s steps(6) infinite;
+    // the grain used to be the fastest thing on screen in a piece about
+    // slowness; everything else moves on a 40-150s cycle
+    animation: noiseFX 4s steps(6) infinite;
     opacity: .6;
 }
 
@@ -211,7 +231,9 @@ input {
     width: 200px;
     height: 200px;
     background-color: $lightAltColor60;
-    box-shadow: 0 0 2px $lightAltColor20;
+    // --glow is driven by the audio energy, so the focal point of the page
+    // breathes with the music instead of only running its own 50s cycle
+    box-shadow: 0 0 calc(2px + var(--glow, 0) * 90px) rgba(174, 207, 223, calc(.12 + var(--glow, 0) * .5));
     position: absolute;
     top: 0;
     bottom: 0;
@@ -383,102 +405,106 @@ button {
     border-radius: 3px;
 }
 
+// play and pause are two icons that cross-fade, so pause reads as two bars
+// instead of the single solid block the old border trick produced
 #start {
-    width: 80px;
-    height: 80px;
     position: absolute;
     top: 0;
     bottom: 0;
     left: 0;
     right: 0;
     margin: auto;
-    margin-left: 74px;
+    width: 74px;
+    height: 74px;
     border: 0;
     background: transparent;
-    box-sizing: border-box;
-    width: 0;
-    height: 74px;
-    border-color: transparent transparent transparent #5168A7;
-    transition: .15s all ease-in-out;
     cursor: pointer;
-    border-style: solid;
-    border-width: 37px 0 37px 60px;
 
-    &.pause {
-        border-style: solid;
-        border-width: 0 0 0 75px;
-        margin-left: 65px;
+    &:before,
+    &:after {
+        content: '';
+        position: absolute;
+        top: 0;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        margin: auto;
+        transition: opacity .25s ease-in-out, background-color .15s ease-in-out, border-color .15s ease-in-out;
     }
 
-    &:hover {
+    // play: triangle, nudged right so it sits optically centred
+    &:before {
+        width: 0;
+        height: 0;
+        border-style: solid;
+        border-width: 32px 0 32px 52px;
+        border-color: transparent transparent transparent #5168A7;
+        transform: translateX(9px);
+    }
+
+    // pause: two bars cut out of one box
+    &:after {
+        width: 52px;
+        height: 64px;
+        background: linear-gradient(to right, #5168A7 0 36%, transparent 36% 64%, #5168A7 64% 100%);
+        opacity: 0;
+    }
+
+    &.pause:before {
+        opacity: 0;
+    }
+
+    &.pause:after {
+        opacity: 1;
+    }
+
+    &:hover:before {
         border-color: transparent transparent transparent #6279B8;
     }
-}
 
-#stop {
-    position: absolute;
-    bottom: 0;
-    right: 0;
-}
-
-.openinfo {
-    display: block;
-    position: absolute;
-    top: 250px;
-    left: 68px;
-    text-align: center;
-    font-family: 'Staatliches';
-    font-size: 2em;
-    color: $lightAltColor;
-    opacity: .5;
-}
-
-.sleeptimer {
-    display: block;
-    position: absolute;
-    top: 296px;
-    left: 84px;
-    text-align: center;
-    font-family: 'Staatliches';
-    font-size: 1.2em;
-    color: $lightAltColor;
-    opacity: .35;
-    transition: opacity .3s ease-in-out;
-
-    &:hover {
-        opacity: .6;
-    }
-
-    &.armed {
-        opacity: .8;
+    &:hover:after {
+        background: linear-gradient(to right, #6279B8 0 36%, transparent 36% 64%, #6279B8 64% 100%);
     }
 }
 
-.midilink {
-    display: block;
+// one size, one weight, laid out as a row: none of these is more important
+// than the others
+.controls {
     position: absolute;
-    top: 322px;
-    left: 90px;
-    text-align: center;
-    font-family: 'Staatliches';
-    font-size: .9em;
-    color: $lightAltColor;
-    opacity: .3;
-    transition: opacity .3s ease-in-out;
+    top: 258px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    align-items: center;
+    gap: 4px;
 
-    &:hover {
-        opacity: .6;
+    button {
+        min-width: 44px;
+        min-height: 44px;
+        padding: 0 10px;
+        font-family: 'Staatliches';
+        font-size: 1.25rem;
+        line-height: 1;
+        letter-spacing: .04em;
+        color: $lightAltColor;
+        opacity: .45;
+        transition: opacity .3s ease-in-out;
+
+        &:hover {
+            opacity: .85;
+        }
     }
 
-    &.connected {
-        opacity: .8;
+    .sleeptimer.armed,
+    .midilink.connected {
+        opacity: .9;
     }
 }
 
 .info {
     display: block;
     position: absolute;
-    top: 300px;
+    top: 318px;
     left: -165px;
     width: 550px;
     padding: 30px;
@@ -534,14 +560,19 @@ button {
     height: 100%;
     overflow: hidden;
 
+    // every visual takes its colour from the layer's --hue, set by the player
+    // from score.json. one grammar: vertical is pitch, horizontal is panning.
     .drop {
+        --hue: 200;
+        --ring: hsl(var(--hue) 42% 78% / .73);
+        --ring-off: hsl(var(--hue) 42% 78% / 0);
+        --halo: hsl(var(--hue) 32% 71% / .67);
+        --halo-off: hsl(var(--hue) 32% 71% / 0);
+
         position: absolute;
-        //opacity: 0;
-        top: 10%;
-        left: 10%;
         width: 15px;
         height: 15px;
-        border: #AECFDF00 2px solid;
+        border: var(--ring-off) 2px solid;
         border-radius: 900px;
         animation-name: ripple;
         animation-duration: 9s;
@@ -549,17 +580,18 @@ button {
         filter: blur(3px);
 
         &.piano {
-            border-color: #5e737d00;
+            --ring: hsl(var(--hue) 32% 35% / .87);
+            --ring-off: hsl(var(--hue) 32% 35% / 0);
+            --halo: hsl(var(--hue) 32% 35% / .87);
+            --halo-off: hsl(var(--hue) 32% 35% / 0);
+
             border-width: 3px;
-            animation-name: ripplepiano;
             animation-duration: 12s;
 
             &:after {
                 top: -3px;
                 left: -3px;
-                border-color: #5e737d00;
                 border-width: 3px;
-                animation-name: ripplepiano-2;
                 animation-duration: 13.5s;
             }
         }
@@ -567,12 +599,11 @@ button {
         &:after {
             content: '';
             position: absolute;
-            //opacity: 0;
             top: -2px;
             left: -2px;
             width: 15px;
             height: 15px;
-            border: #9DBECE00 1px solid;
+            border: var(--halo-off) 1px solid;
             border-radius: 900px;
             animation-name: ripple-2;
             animation-duration: 10s;
@@ -580,16 +611,54 @@ button {
         }
     }
 
+    // a drone is a sustained bed, so it reads as a soft horizontal zone
     .note {
+        --hue: 225;
+        --bed: hsl(var(--hue) 34% 48% / .13);
+        --bed-off: hsl(var(--hue) 34% 48% / 0);
+
         position: absolute;
         left: 0;
         width: 100%;
-        height: 20%;
-        background: linear-gradient(#5168A700 10%, #5168A722 50%, #5168A700 90%);
+        height: 14%;
+        background: linear-gradient(var(--bed-off) 10%, var(--bed) 50%, var(--bed-off) 90%);
         animation-name: note;
         animation-duration: 14s;
         animation-iteration-count: 1;
         transition: all 1s ease-in-out;
+    }
+
+    // effects have no definite pitch: a quick spark rather than a ripple
+    .spark {
+        --hue: 190;
+        --flash: hsl(var(--hue) 55% 88% / .85);
+        --flash-off: hsl(var(--hue) 55% 88% / 0);
+
+        position: absolute;
+        width: 7px;
+        height: 7px;
+        margin: -3px 0 0 -3px;
+        border-radius: 50%;
+        background: var(--flash-off);
+        animation: spark 4s ease-out 1;
+        filter: blur(2px);
+    }
+}
+
+@keyframes spark {
+    0% {
+        transform: scale(.4);
+        background: var(--flash-off);
+    }
+
+    12% {
+        transform: scale(1);
+        background: var(--flash);
+    }
+
+    100% {
+        transform: scale(2.4);
+        background: var(--flash-off);
     }
 }
 
@@ -621,82 +690,41 @@ button {
     }
 }
 
+// the piano used to need its own copies of these purely to carry different
+// colours; now that the colour comes from --hue, one pair covers every layer
 @keyframes ripple {
     0% {
-        //opacity: 0;
         transform: scale(1);
-        border-color: #AECFDF00;
+        border-color: var(--ring-off);
         filter: blur(10px);
     }
 
     10% {
-        border-color: #AECFDFbb;
+        border-color: var(--ring);
         filter: blur(1px);
-        //transform: scale(1);
     }
 
     100% {
         transform: scale(6);
-        border-color: #AECFDF00;
+        border-color: var(--ring-off);
         filter: blur(20px);
     }
 }
 
 @keyframes ripple-2 {
     0% {
-        border-color: #9DBECE00;
+        border-color: var(--halo-off);
         transform: scale(1);
         opacity: 1;
     }
 
     10% {
-        border-color: #9DBECEaa;
-        //transform: scale(1);
+        border-color: var(--halo);
     }
 
     100% {
-        border-color: #9DBECE00;
+        border-color: var(--halo-off);
         transform: scale(6);
-        opacity: 0;
-    }
-}
-
-@keyframes ripplepiano {
-    0% {
-        //opacity: 0;
-        transform: scale(1);
-        border-color: #443d7800;
-        filter: blur(10px);
-    }
-
-    10% {
-        border-color: #443d78dd;
-        filter: blur(1px);
-        //transform: scale(1);
-    }
-
-    100% {
-        transform: scale(6);
-        border-color: #443d7800;
-        filter: blur(20px);
-    }
-}
-
-@keyframes ripplepiano-2 {
-    0% {
-        border-color: #443d7800;
-        transform: scale(1);
-        opacity: 1;
-    }
-
-    10% {
-        border-color: #443d78dd;
-        transform: scale(1);
-    }
-
-    100% {
-        border-color: #443d7800;
-        transform: scale(8);
         opacity: 0;
     }
 }
@@ -748,9 +776,10 @@ button {
 
 #tag {
     display: block;
-    font-family: Courier New, Courier, Monospace;
-    font-weight: bold;
-    line-height: .65em;
+    font-family: 'Staatliches';
+    font-size: 1.05em;
+    letter-spacing: .08em;
+    line-height: .85em;
     color: $lightAltColor60;
     position: fixed;
     bottom: 5px;
@@ -826,12 +855,16 @@ button {
 
 // slow wide pulse rising from the bottom when a sub plays
 .dropscanvas .subpulse {
+    --hue: 235;
+    --deep: hsl(var(--hue) 31% 33% / .3);
+    --deep-off: hsl(var(--hue) 31% 33% / 0);
+
     position: absolute;
     bottom: 0;
     left: 0;
     width: 100%;
     height: 45%;
-    background: linear-gradient(rgba(81, 104, 167, 0) 0%, rgba(58, 68, 110, .3) 100%);
+    background: linear-gradient(var(--deep-off) 0%, var(--deep) 100%);
     animation: subpulse 12s ease-in-out 1;
     opacity: 0;
     pointer-events: none;
