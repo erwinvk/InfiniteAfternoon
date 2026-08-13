@@ -5,6 +5,9 @@
     'use strict';
 
     const $ = (sel) => document.querySelector(sel);
+    // optional controls may be absent from the markup; wiring one up must not
+    // throw and take every handler below it with it
+    const on = (el, event, fn) => { if (el) el.addEventListener(event, fn); };
 
     // ---- score ----
     let score = null;
@@ -368,25 +371,28 @@
     let sleepChoiceIndex = 0;
     let sleepTimeouts = [];
 
-    sleepButton.addEventListener('click', function () {
+    on(sleepButton, 'click', function () {
         sleepChoiceIndex = (sleepChoiceIndex + 1) % sleepChoices.length;
         armSleepTimer();
     });
+
+    function sleepLabel(text, armed, aria) {
+        if (!sleepButton) return;
+        sleepButton.textContent = text;
+        sleepButton.classList.toggle('armed', armed);
+        sleepButton.setAttribute('aria-label', aria);
+    }
 
     function armSleepTimer() {
         clearSleepTimer(false);
         const minutes = sleepChoices[sleepChoiceIndex];
 
         if (minutes === 0) {
-            sleepButton.textContent = 'timer';
-            sleepButton.classList.remove('armed');
-            sleepButton.setAttribute('aria-label', 'Sleep timer off');
+            sleepLabel('timer', false, 'Sleep timer off');
             return;
         }
 
-        sleepButton.textContent = minutes + 'm';
-        sleepButton.classList.add('armed');
-        sleepButton.setAttribute('aria-label', 'Sleep timer, ' + minutes + ' minutes');
+        sleepLabel(minutes + 'm', true, 'Sleep timer, ' + minutes + ' minutes');
         startSunset(minutes);
 
         // fade out during the last sleepFadeSeconds, then pause
@@ -414,9 +420,7 @@
 
         if (resetLabel) {
             sleepChoiceIndex = 0;
-            sleepButton.textContent = 'timer';
-            sleepButton.classList.remove('armed');
-            sleepButton.setAttribute('aria-label', 'Sleep timer off');
+            sleepLabel('timer', false, 'Sleep timer off');
         }
 
         resetSunset();
@@ -492,22 +496,32 @@
     });
 
     // ---- web midi ----
+    // every control below the circle is optional: leaving one out of the markup
+    // must never take the rest of the page down with it
     const midiButton = $('.midilink');
 
-    midiButton.addEventListener('click', connectMidi);
+    if (midiButton) {
+        midiButton.addEventListener('click', connectMidi);
 
-    // reconnect silently when access was granted in an earlier visit
-    try {
-        if (navigator.permissions && navigator.requestMIDIAccess) {
-            navigator.permissions.query({ name: 'midi' })
-                .then(function (status) { if (status.state === 'granted') connectMidi(); })
-                .catch(function () { });
-        }
-    } catch (e) { /* permissions.query rejects on browsers without midi */ }
+        // reconnect silently when access was granted in an earlier visit
+        try {
+            if (navigator.permissions && navigator.requestMIDIAccess) {
+                navigator.permissions.query({ name: 'midi' })
+                    .then(function (status) { if (status.state === 'granted') connectMidi(); })
+                    .catch(function () { });
+            }
+        } catch (e) { /* permissions.query rejects on browsers without midi */ }
+    }
+
+    function midiLabel(text, connected) {
+        if (!midiButton) return;
+        midiButton.textContent = text;
+        midiButton.classList.toggle('connected', !!connected);
+    }
 
     function connectMidi() {
         if (!navigator.requestMIDIAccess) {
-            midiButton.textContent = 'no midi';
+            midiLabel('no midi');
             return;
         }
 
@@ -518,14 +532,13 @@
                     input.onmidimessage = onMidiMessage;
                     inputCount++;
                 });
-                midiButton.textContent = inputCount > 0 ? 'midi ✓' : 'no midi';
-                midiButton.classList.toggle('connected', inputCount > 0);
+                midiLabel(inputCount > 0 ? 'midi ✓' : 'no midi', inputCount > 0);
             }
 
             access.onstatechange = attachInputs;
             attachInputs();
         }, function () {
-            midiButton.textContent = 'no midi';
+            midiLabel('no midi');
         });
     }
 
@@ -592,7 +605,7 @@
     const infoContainer = $('.infocontainer');
     const info = $('.info');
 
-    infoButton.addEventListener('click', function () {
+    on(infoButton, 'click', function () {
         const opening = info.classList.contains('hidden');
 
         if (opening) {
@@ -609,7 +622,7 @@
     // ---- sharing ----
     const shareButton = $('.share');
 
-    shareButton.addEventListener('click', function () {
+    on(shareButton, 'click', function () {
         const timetext = elapsedString();
         const shareUrl = 'https://infiniteafternoon.com/?afternoon=' + seed.toString(36);
         const copyText = timetext.length === 0
@@ -645,11 +658,12 @@
 
     function tickElapsed() {
         const timetext = elapsedString();
-        $('.time').textContent = timetext.length > 0 ? 'listened for ' + timetext : '';
+        const timeEl = $('.time');
+        if (timeEl) timeEl.textContent = timetext.length > 0 ? 'listened for ' + timetext : '';
 
         // dusk creeps in the longer the afternoon lasts
-        const elapsedMinutes = (new Date() - startTime) / 60000;
-        $('.dusk').style.opacity = Math.min(0.8, elapsedMinutes / 75);
+        const duskEl = $('.dusk');
+        if (duskEl) duskEl.style.opacity = Math.min(0.8, (new Date() - startTime) / 60000 / 75);
 
         setTimeout(tickElapsed, 5000);
     }
