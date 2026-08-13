@@ -117,8 +117,38 @@
     }
 
     // load every sample of a layer in parallel
-    function loadLayer(layer) {
-        return Promise.all(layer.samples.map((s) => getBuffer(s.file)));
+    function loadLayer(layer, onEach) {
+        return Promise.all(layer.samples.map(function (s) {
+            return getBuffer(s.file).then(function (buffer) {
+                if (onEach) onEach();
+                return buffer;
+            });
+        }));
+    }
+
+    // pressing play used to be followed by silence while 13MB of audio arrived,
+    // with nothing on screen to say so. the circle fills as the buffers land.
+    let loadedCount = 0;
+    let loadTotal = 0;
+
+    function beginLoading(total) {
+        loadedCount = 0;
+        loadTotal = total;
+        if (total === 0) return;
+        circle.classList.add('loading');
+        circle.style.setProperty('--loaded', '0');
+    }
+
+    function markLoaded(count) {
+        loadedCount += count;
+        if (loadTotal === 0) return;
+
+        circle.style.setProperty('--loaded', (loadedCount / loadTotal).toFixed(3));
+
+        if (loadedCount >= loadTotal) {
+            circle.classList.remove('loading');
+            circle.style.removeProperty('--loaded');
+        }
     }
 
     function playBuffer(buffer, pan, loop) {
@@ -190,8 +220,10 @@
             };
         });
 
+        beginLoading(score.layers.reduce((n, l) => n + l.samples.length, 0));
+
         score.layers.forEach(function (layer, layerIndex) {
-            loadLayer(layer).then(function (buffers) {
+            loadLayer(layer, function () { markLoaded(1); }).then(function (buffers) {
                 if (!isPlaying) return;
 
                 if (layer.mode === 'retrigger') {
@@ -238,7 +270,32 @@
         startTime = new Date();
         updateMediaSession(true);
         startEnergyAnimation();
+        showPlayAlongHint();
         tickElapsed();
+    }
+
+    // the premise is invisible until someone opens 'about', which nobody does.
+    // one line before you press play, one hint once playing is the thing to do.
+    const invitation = $('.invitation');
+    const coarsePointer = window.matchMedia('(pointer: coarse)').matches;
+    let hintTimeout;
+
+    function showPlayAlongHint() {
+        if (!invitation || invitation.dataset.hinted) return;
+        invitation.dataset.hinted = 'yes';
+
+        invitation.classList.add('fading');
+        clearTimeout(hintTimeout);
+
+        hintTimeout = setTimeout(function () {
+            invitation.textContent = (coarsePointer ? 'Tap' : 'Click') + ' anywhere to drop a note.';
+            invitation.classList.remove('fading');
+
+            hintTimeout = setTimeout(function () {
+                invitation.classList.add('fading');
+                setTimeout(function () { invitation.hidden = true; }, 2000);
+            }, 9000);
+        }, 1200);
     }
 
     function stop() {
@@ -257,6 +314,11 @@
         clearSleepTimer(true);
         stopEnergyAnimation();
         updateMediaSession(false);
+
+        // pausing halfway through the first load leaves no half-filled circle
+        circle.classList.remove('loading');
+        circle.style.removeProperty('--loaded');
+        loadTotal = 0;
     }
 
     // ---- visuals ----
@@ -646,7 +708,11 @@
             : 'I listened to ' + shareUrl + ' for ' + timetext + '. That exact afternoon is in the link.';
 
         shareButton.classList.add('copied');
-        navigator.clipboard.writeText(copyText);
+        // writeText rejects when the document is not focused or permission is
+        // refused; an unhandled rejection here helps nobody
+        navigator.clipboard.writeText(copyText).catch(function () {
+            shareButton.classList.remove('copied');
+        });
 
         setTimeout(function () { shareButton.classList.remove('copied'); }, 5000);
     });
@@ -672,14 +738,34 @@
         return text;
     }
 
+    // the sky turns over the length of a long listen: afternoon into dusk,
+    // dusk into night, and near the end of a four hour stretch the first
+    // cold hint of morning. each stage is one overlay whose opacity is a
+    // simple ramp, so they cross-fade into each other.
+    function ramp(value, from, to) {
+        return Math.max(0, Math.min(1, (value - from) / (to - from)));
+    }
+
+    function paintSky(minutes) {
+        const dusk = $('.dusk');
+        const night = $('.night');
+        const dawn = $('.dawn');
+        if (!dusk) return;
+
+        // dusk arrives over the first hour and a quarter, then gives way
+        dusk.style.opacity = (ramp(minutes, 0, 75) * 0.8 - ramp(minutes, 75, 150) * 0.55).toFixed(3);
+        // night settles in behind it
+        night.style.opacity = (ramp(minutes, 60, 165) * 0.85).toFixed(3);
+        // and after about three hours, the first cold light
+        dawn.style.opacity = (ramp(minutes, 190, 260) * 0.3).toFixed(3);
+    }
+
     function tickElapsed() {
         const timetext = elapsedString();
         const timeEl = $('.time');
         if (timeEl) timeEl.textContent = timetext.length > 0 ? 'listened for ' + timetext : '';
 
-        // dusk creeps in the longer the afternoon lasts
-        const duskEl = $('.dusk');
-        if (duskEl) duskEl.style.opacity = Math.min(0.8, (new Date() - startTime) / 60000 / 75);
+        paintSky((new Date() - startTime) / 60000);
 
         setTimeout(tickElapsed, 5000);
     }
@@ -720,6 +806,8 @@
         get energy() { return smoothedEnergy; },
         get pending() { return pendingTimeouts.size; },
         get cached() { return bufferCache.size; },
+        get loaded() { return loadTotal ? loadedCount + '/' + loadTotal : 'idle'; },
+        paintSky: paintSky,
         get state() { return audioContext ? audioContext.state : 'none'; },
         get schedule() { return lastPlans; },
         // draw one of a layer's visuals without waiting for its interval

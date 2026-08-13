@@ -271,36 +271,45 @@ input {
         opacity: .2;
     }
 
-    &.fourth {
-        background-color: #BEDFEF;
-        z-index: -1;
-        animation: circleFx 105s ease-in-out infinite;
-        opacity: .3;
-    }
+    // while the samples arrive, the circle fills from the bottom
+    &.loading {
+        background-image: linear-gradient(to top, $lightAltColor20 calc(var(--loaded, 0) * 100% - 7%), transparent calc(var(--loaded, 0) * 100% + 7%));
 
-    &.fifth {
-        background-color: #BDDEEE;
-        z-index: -1;
-        animation: circleFx 85s ease-in-out infinite alternate-reverse;
-        opacity: .2;
+        #start:before,
+        #start:after {
+            opacity: .25;
+        }
     }
 }
 
-#volumecontrol {
+// the label used to be a pseudo-element on the input itself, which browsers
+// are not required to render at all, positioned at a fixed -30px
+.volume {
     position: absolute;
     bottom: -40px;
-    left: 0;
-    width: 100%;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    align-items: center;
+}
 
-    &:after {
-        content: 'vol';
-        position: absolute;
-        color: $lightAltColor60;
-        right: -30px;
-        top: -10px;
-        text-transform: uppercase;
-        font-family: 'Staatliches', sans-serif;
-    }
+// the label hangs outside the track so the slider itself stays centred
+// under the circle
+.vollabel {
+    position: absolute;
+    left: calc(100% + 12px);
+    top: 50%;
+    transform: translateY(-50%);
+    font-family: 'Staatliches';
+    font-size: 1rem;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+    color: $lightAltColor60;
+    line-height: 1;
+}
+
+#volumecontrol {
+    width: 200px;
 }
 
 input[type=range] {
@@ -548,9 +557,33 @@ button {
         font-weight: bold;
     }
 
-    h6 {
-        font-weight: bold;
-        margin-bottom: 0;
+    // a readable measure and a rhythm that groups each answer with its question
+    p {
+        max-width: 62ch;
+        line-height: 1.55;
+        margin-bottom: .7rem;
+    }
+
+    h2 {
+        margin-bottom: 1.2rem;
+        line-height: .9;
+    }
+
+    h3 {
+        font-family: 'Open Sans', sans-serif;
+        font-size: 1rem;
+        font-weight: 700;
+        margin: 1.8rem 0 .35rem;
+        letter-spacing: .01em;
+    }
+
+    h3:first-of-type {
+        margin-top: 0;
+    }
+
+    .phonehint {
+        margin-bottom: 1.4rem;
+        font-style: italic;
     }
 }
 
@@ -903,24 +936,113 @@ button {
     z-index: 50;
 }
 
-// the afternoon slowly turns to dusk the longer you listen
-.dusk {
+// the sky turns over a long listen: afternoon, dusk, night, a hint of dawn
+.sky {
     pointer-events: none;
     position: fixed;
     inset: 0;
     z-index: -1;
-    background: linear-gradient(rgba(25, 25, 25, 0) 30%, rgba(90, 45, 80, .5) 75%, rgba(160, 80, 50, .5) 100%);
     opacity: 0;
     transition: opacity 60s linear;
 }
 
+.dusk {
+    background: linear-gradient(rgba(25, 25, 25, 0) 30%, rgba(90, 45, 80, .5) 75%, rgba(160, 80, 50, .5) 100%);
+}
+
+.night {
+    background: linear-gradient(rgba(8, 10, 24, .75) 0%, rgba(10, 12, 30, .55) 55%, rgba(16, 18, 38, .7) 100%);
+}
+
+.dawn {
+    background: linear-gradient(rgba(20, 30, 55, 0) 40%, rgba(120, 140, 180, .45) 88%, rgba(190, 200, 215, .5) 100%);
+}
+
+// the invitation: the whole premise, before anyone has opened 'about'
+.invitation {
+    position: fixed;
+    top: calc(50% - 190px);
+    left: 50%;
+    transform: translateX(-50%);
+    width: max-content;
+    max-width: 88vw;
+    margin: 0;
+    text-align: center;
+    font-size: .95rem;
+    letter-spacing: .04em;
+    color: $lightAltColor;
+    opacity: .55;
+    transition: opacity 2s ease-in-out;
+    pointer-events: none;
+
+    &.fading {
+        opacity: 0;
+    }
+}
+
+// reduced motion should calm the piece, not switch off half of it. the
+// ambient drift stops, but every note still appears where its pitch and
+// panning put it — it fades in and out instead of travelling.
 @media (prefers-reduced-motion: reduce) {
     #titlecontainer,
     #titlecontainer h1,
     .themiddle,
     .noise,
-    .dusk,
+    .sky,
     .parallax > use {
         animation: none !important;
+    }
+
+    .dropscanvas .drop,
+    .dropscanvas .drop:after {
+        animation-name: still-drop !important;
+        filter: none !important;
+    }
+
+    .dropscanvas .spark {
+        animation-name: still-spark !important;
+        filter: none !important;
+    }
+
+    .dropscanvas .note {
+        animation-name: still-note !important;
+    }
+
+    .dropscanvas .subpulse {
+        animation-name: still-note !important;
+    }
+
+    .invitation {
+        transition: none;
+    }
+}
+
+@keyframes still-drop {
+    0%, 100% {
+        border-color: var(--ring-off);
+    }
+
+    18%, 55% {
+        border-color: var(--ring);
+    }
+}
+
+@keyframes still-spark {
+    0%, 100% {
+        background: var(--flash-off);
+    }
+
+    18%, 55% {
+        background: var(--flash);
+    }
+}
+
+@keyframes still-note {
+    0%, 100% {
+        opacity: 0;
+    }
+
+    20%, 70% {
+        opacity: 1;
     }
 }
