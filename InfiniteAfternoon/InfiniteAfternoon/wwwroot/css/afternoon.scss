@@ -242,7 +242,9 @@ input {
     margin: auto;
     border-radius: 999px;
     padding: 20px;
-    transition: all 10s ease-in-out, transform 1s ease-in-out;
+    // opacity and visibility come last so they beat the 10s 'all' when the
+    // screen is cleared
+    transition: all 10s ease-in-out, transform 1s ease-in-out, opacity .6s ease-in-out, visibility .6s;
     opacity: 1;
     animation: mainCircleFx 50s ease-in-out infinite;
     transform: translateZ(0);
@@ -769,6 +771,7 @@ button {
     position: fixed;
     bottom: 5px;
     right: 5px;
+    transition: opacity .6s ease-in-out, visibility .6s;
 
     &:after {
         content: 'share';
@@ -805,6 +808,7 @@ button {
    font-size: 1em;
    color: $lightAltColor60;
    font-family: 'Staatliches';
+   transition: opacity .6s ease-in-out, visibility .6s;
 }
 
 #tag {
@@ -836,55 +840,63 @@ button {
     z-index: -1;
 }
 
+// a canvas now: the profile is the energy of the last eight minutes, not a
+// decorative path on a loop
 .waves {
     display: block;
     width: 100%;
-    height: 110px;
-    margin-bottom: -7px; /*Fix for safari gap*/
+    height: 170px;
 }
 
-.parallax > use {
-    animation: move-forever 75s cubic-bezier(.55,.5,.45,.5) infinite;
-}
-
-.parallax > use:nth-child(1) {
-    animation-delay: -32s;
-    animation-duration: 87s;
-}
-
-.parallax > use:nth-child(2) {
-    animation-delay: -83s;
-    animation-duration: 105s;
-}
-
-.parallax > use:nth-child(3) {
-    animation-delay: -59s;
-    animation-duration: 83s;
-}
-
-.parallax > use:nth-child(4) {
-    animation-delay: -65s;
-    animation-duration: 147s;
-}
-
-@keyframes move-forever {
-    0% {
-        transform: translate3d(-90px,0,0);
-    }
-
-    100% {
-        transform: translate3d(85px,0,0);
-    }
-}
-/*Shrinking for mobile*/
 @media (max-width: 768px) {
     .waves {
-        height: 40px;
-        min-height: 40px;
+        height: 110px;
     }
 }
 
 // waves end
+
+// ---- clearing the screen ----
+.uitoggle {
+    position: fixed;
+    top: 10px;
+    right: 10px;
+    min-width: 44px;
+    min-height: 44px;
+    padding: 0 12px;
+    border: 0;
+    background: none;
+    cursor: pointer;
+    font-family: 'Staatliches';
+    font-size: 1rem;
+    letter-spacing: .06em;
+    color: $lightAltColor;
+    opacity: .3;
+    transition: opacity .3s ease-in-out;
+
+    &:hover {
+        opacity: .8;
+    }
+}
+
+body.ui-hidden {
+    .themiddle,
+    .invitation,
+    .time,
+    .share {
+        opacity: 0;
+        visibility: hidden;   // also takes them out of the tab order
+        pointer-events: none;
+    }
+
+    .uitoggle {
+        opacity: .12;
+
+        &:hover {
+            opacity: .7;
+        }
+    }
+}
 
 // slow wide pulse rising from the bottom when a sub plays
 .dropscanvas .subpulse {
@@ -984,12 +996,13 @@ button {
 // ambient drift stops, but every note still appears where its pitch and
 // panning put it — it fades in and out instead of travelling.
 @media (prefers-reduced-motion: reduce) {
+    // the horizon is left alone: it drifts a couple of pixels a second, which
+    // is slower than the clock and reads as stillness
     #titlecontainer,
     #titlecontainer h1,
     .themiddle,
     .noise,
-    .sky,
-    .parallax > use {
+    .sky {
         animation: none !important;
     }
 

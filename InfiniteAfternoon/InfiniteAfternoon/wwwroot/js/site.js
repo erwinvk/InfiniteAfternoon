@@ -375,7 +375,7 @@
     // ---- audio-reactive visuals ----
     const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     const finePointer = window.matchMedia('(pointer: fine)').matches;
-    let energyFrame, smoothedEnergy = 0;
+    let energyFrame, smoothedEnergy = 0, lastWavesDraw = 0;
     const energyData = new Uint8Array(128);
 
     function startEnergyAnimation() {
@@ -401,6 +401,16 @@
             // the circle breathes too. a custom property, not a transform, so
             // this never fights the sunset transition for the same property
             circle.style.setProperty('--glow', smoothedEnergy.toFixed(3));
+
+            // the horizon records this moment and glides on. redrawn at about
+            // 12fps rather than every frame — it is a landscape, not a meter
+            const now = performance.now();
+            pushHistory(now);
+
+            if (now - lastWavesDraw > 80) {
+                lastWavesDraw = now;
+                drawWaves((now - lastHistoryPush) / HISTORY_STEP_MS);
+            }
 
             energyFrame = requestAnimationFrame(tick);
         })();
@@ -538,17 +548,21 @@
         const layer = layerFor('high');
         if (!layer) return;
 
-        // top-to-bottom bands, high notes at the top
+        // top-to-bottom bands, high notes at the top. the fractions are clamped
+        // because a viewport reported as zero makes the index NaN and there is
+        // no band at NaN.
         const byPitch = layer.samples.map((s, i) => ({ s: s, i: i })).sort((a, b) => b.s.midi - a.s.midi);
-        const yFraction = e.clientY / window.innerHeight;
-        const band = byPitch[Math.min(byPitch.length - 1, Math.floor(yFraction * byPitch.length))];
+        const yFraction = Math.max(0, Math.min(0.999, e.clientY / (window.innerHeight || 1)));
+        const xFraction = Math.max(0, Math.min(1, e.clientX / (window.innerWidth || 1)));
+        const band = byPitch[Math.floor(yFraction * byPitch.length)];
+        if (!band) return;
 
-        let pan = Math.max(-0.99, Math.min(0.99, (e.clientX / window.innerWidth) * 2 - 1));
+        let pan = Math.max(-0.99, Math.min(0.99, xFraction * 2 - 1));
         if (Math.abs(pan) < 0.02) pan = 0.02; // keep the panned (and delayed) signal path
 
         loadLayer(layer).then(function (buffers) {
             playBuffer(buffers[band.i], pan, false);
-            showVisual(layer, band.s, (e.clientX / window.innerWidth) * 100, (yFraction * 100) + '%');
+            showVisual(layer, band.s, xFraction * 100, (yFraction * 100) + '%');
         });
     });
 
@@ -660,6 +674,110 @@
             const y = Math.max(5, Math.min(95, 100 - ((noteNumber - 30) / 60) * 100));
             showVisual(layer, layer.samples[nearest], (pan + 1) * 50, y + '%');
         });
+    }
+
+    // ---- the horizon is the memory of the piece ----
+    // Everything else on the page is the present tense. This is not: the land
+    // at the bottom of the screen is a record of the energy of the last eight
+    // minutes, newest at the right. Read top to bottom the screen is future,
+    // now, and what has already gone.
+    const wavesCanvas = $('.waves');
+    // few enough samples that a single swell is a visible feature of the land
+    // rather than a 4px ripple
+    const HISTORY_LENGTH = 150;
+    const HISTORY_STEP_MS = 3200;              // 150 * 3.2s = eight minutes
+    // not 'history': that name shadows window.history, which start() needs to
+    // write the seed into the url
+    const energyHistory = new Array(HISTORY_LENGTH).fill(0);
+    let wavesCtx, wavesWidth, wavesHeight, historyOffset = 0, lastHistoryPush = 0;
+
+    // the same memory drawn at four depths, the way the old decorative waves
+    // layered one path — except these are the real thing
+    const horizons = [
+        { lift: 0.30, amp: 0.46, alpha: 0.16, shift: 0 },
+        { lift: 0.22, amp: 0.34, alpha: 0.11, shift: 19 },
+        { lift: 0.15, amp: 0.24, alpha: 0.08, shift: 43 },
+        { lift: 0.09, amp: 0.16, alpha: 0.12, shift: 67 }
+    ];
+
+    function sizeWaves() {
+        if (!wavesCanvas) return;
+
+        const rect = wavesCanvas.getBoundingClientRect();
+        const dpr = window.devicePixelRatio || 1;
+
+        wavesWidth = Math.max(1, Math.round(rect.width));
+        wavesHeight = Math.max(1, Math.round(rect.height));
+        wavesCanvas.width = Math.round(wavesWidth * dpr);
+        wavesCanvas.height = Math.round(wavesHeight * dpr);
+
+        wavesCtx = wavesCanvas.getContext('2d');
+        wavesCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
+        drawWaves();
+    }
+
+    // a standing shape so the land exists even in silence; the music embosses it
+    // kept small on purpose: enough that silence is still a landscape, not so
+    // much that it drowns out what was actually played
+    function bedrock(i) {
+        return Math.sin(i * 0.21) * 0.35 + Math.sin(i * 0.079 + 1.3) * 0.5;
+    }
+
+    function drawWaves(subStep) {
+        if (!wavesCtx) return;
+
+        wavesCtx.clearRect(0, 0, wavesWidth, wavesHeight);
+
+        const slide = subStep || 0;   // 0..1 between two samples, keeps it gliding
+        const stepX = wavesWidth / (HISTORY_LENGTH - 1);
+
+        horizons.forEach(function (horizon) {
+            wavesCtx.beginPath();
+            wavesCtx.moveTo(-stepX, wavesHeight);
+
+            let previousX = -stepX;
+            let previousY = wavesHeight;
+
+            for (let i = 0; i < HISTORY_LENGTH; i++) {
+                const sample = energyHistory[(historyOffset + i + horizon.shift) % HISTORY_LENGTH];
+                const x = (i - slide) * stepX;
+                const height = horizon.lift + bedrock(i + horizon.shift) * 0.04 + sample * horizon.amp;
+                const y = wavesHeight - height * wavesHeight;
+
+                // smooth the profile so it reads as land, not as a graph
+                wavesCtx.quadraticCurveTo(previousX, previousY, (previousX + x) / 2, (previousY + y) / 2);
+                previousX = x;
+                previousY = y;
+            }
+
+            wavesCtx.lineTo(wavesWidth + stepX, previousY);
+            wavesCtx.lineTo(wavesWidth + stepX, wavesHeight);
+            wavesCtx.closePath();
+
+            wavesCtx.fillStyle = 'rgba(81, 104, 167, ' + horizon.alpha + ')';
+            wavesCtx.fill();
+        });
+    }
+
+    function pushHistory(now) {
+        if (now - lastHistoryPush < HISTORY_STEP_MS) return false;
+
+        lastHistoryPush = now;
+        energyHistory[historyOffset] = isPlaying ? Math.min(1, smoothedEnergy * 2.2) : 0;
+        historyOffset = (historyOffset + 1) % HISTORY_LENGTH;
+        return true;
+    }
+
+    if (wavesCanvas) {
+        sizeWaves();
+        window.addEventListener('resize', sizeWaves);
+
+        // when nothing is playing the energy loop is not running, so keep the
+        // land alive on a slow timer of its own
+        setInterval(function () {
+            if (isPlaying) return;
+            if (pushHistory(performance.now())) drawWaves();
+        }, HISTORY_STEP_MS);
     }
 
     // ---- pointer glow, hints that clicking plays a note ----
@@ -828,6 +946,18 @@
         navigator.mediaSession.playbackState = playing ? 'playing' : 'paused';
     }
 
+    // ---- clearing the screen ----
+    // this runs for hours on a second monitor; a bare screen is a reasonable
+    // resting state. clicking still drops notes while the controls are gone.
+    const uiToggle = $('.uitoggle');
+
+    on(uiToggle, 'click', function () {
+        const hidden = document.body.classList.toggle('ui-hidden');
+        uiToggle.textContent = hidden ? 'show' : 'hide';
+        uiToggle.setAttribute('aria-pressed', String(hidden));
+        uiToggle.setAttribute('aria-label', hidden ? 'Show the controls' : 'Hide the controls');
+    });
+
     if ('serviceWorker' in navigator) {
         window.addEventListener('load', function () { navigator.serviceWorker.register('/sw.js'); });
     }
@@ -842,6 +972,9 @@
         get cached() { return bufferCache.size; },
         get loaded() { return loadTotal ? loadedCount + '/' + loadTotal : 'idle'; },
         paintSky: paintSky,
+        // the recorded energy, writable — handy when tuning how the land reads
+        get horizon() { return energyHistory; },
+        redrawHorizon: drawWaves,
         get sky() { const n = new Date(); return skyAt(n.getHours() + n.getMinutes() / 60); },
         get state() { return audioContext ? audioContext.state : 'none'; },
         get schedule() { return lastPlans; },
