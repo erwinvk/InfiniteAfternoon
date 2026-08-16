@@ -41,9 +41,22 @@ self.addEventListener('fetch', (event) => {
         caches.match(event.request).then((cached) => cached || fetch(event.request).then((response) => {
             if (response.ok) {
                 const copy = response.clone();
-                caches.open(CACHE).then((cache) => cache.put(event.request, copy));
+                caches.open(CACHE)
+                    .then((cache) => cache.put(event.request, copy).then(() => dropOtherVersions(cache, url)));
             }
             return response;
         }))
     );
 });
+
+// css and js arrive with a ?v= hash, so every deploy lands under a key of its
+// own and the previous one would sit here for good — six copies of site.js
+// after six deploys. keep the version that was just fetched, drop the rest.
+function dropOtherVersions(cache, url) {
+    if (!url.search) return;
+
+    return cache.keys().then((keys) => Promise.all(keys.map((key) => {
+        const other = new URL(key.url);
+        if (other.pathname === url.pathname && other.search !== url.search) return cache.delete(key);
+    })));
+}

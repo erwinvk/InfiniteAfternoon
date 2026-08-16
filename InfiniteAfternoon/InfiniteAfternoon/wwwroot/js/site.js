@@ -196,10 +196,25 @@
     }
 
     // ---- performing the score ----
+    let fadedIn = false;
+
+    function fadeIn() {
+        if (fadedIn) return;
+        fadedIn = true;
+
+        // cancel first: pausing and starting again within two seconds would
+        // otherwise leave the previous fade-out on the timeline and cut this
+        // ramp short.
+        gainNode.gain.cancelScheduledValues(audioContext.currentTime);
+        gainNode.gain.setValueAtTime(0.01, audioContext.currentTime);
+        gainNode.gain.exponentialRampToValueAtTime(1, audioContext.currentTime + 2);
+    }
+
     function start() {
         buildGraph();
 
         const token = ++runToken;
+        fadedIn = false;
         intervalRng = mulberry32(seed);
         history.replaceState(null, '', '?afternoon=' + seed.toString(36));
 
@@ -229,6 +244,13 @@
             loadLayer(layer, function () { if (token === runToken) markLoaded(1); }).then(function (buffers) {
                 if (!isPlaying || token !== runToken) return;
 
+                // fade the piece in as soon as the first layer is ready, whatever
+                // kind it is. this used to sit inside the retrigger branch, which
+                // tied it to the score having a retrigger layer: stop() leaves the
+                // gain at 0.01, so editing score.json to drop that one layer would
+                // have left the site silent for good after the first pause.
+                fadeIn();
+
                 if (layer.mode === 'retrigger') {
                     let offset = layer.every;
 
@@ -239,13 +261,6 @@
                         }, offset, layer.warpFirst);
                         offset += layer.stagger;
                     });
-
-                    // fade the piece in. cancel first: pausing and starting again
-                    // within two seconds would otherwise leave the previous
-                    // fade-out on the timeline and cut this ramp short.
-                    gainNode.gain.cancelScheduledValues(audioContext.currentTime);
-                    gainNode.gain.setValueAtTime(0.01, audioContext.currentTime);
-                    gainNode.gain.exponentialRampToValueAtTime(1, audioContext.currentTime + 2);
                     return;
                 }
 
@@ -956,7 +971,12 @@
     function tickElapsed() {
         const timetext = elapsedString();
         const timeEl = $('.time');
-        if (timeEl) timeEl.textContent = timetext.length > 0 ? 'listened for ' + timetext : '';
+        const text = timetext.length > 0 ? 'listened for ' + timetext : '';
+
+        // this is an aria-live region and the text only changes once a minute.
+        // writing it every five seconds regardless had screen readers announce
+        // the same sentence twelve times a minute.
+        if (timeEl && timeEl.textContent !== text) timeEl.textContent = text;
 
         clearTimeout(elapsedTimeout);
         elapsedTimeout = setTimeout(tickElapsed, 5000);
@@ -1017,6 +1037,9 @@
         redrawHorizon: drawWaves,
         get sky() { const n = new Date(); return skyAt(n.getHours() + n.getMinutes() / 60); },
         get state() { return audioContext ? audioContext.state : 'none'; },
+        // the fade-in and fade-out live on this one, so it is worth being able
+        // to read it: 1 while the piece is up, 0.01 once it has been paused
+        get gain() { return gainNode ? +gainNode.gain.value.toFixed(4) : null; },
         get schedule() { return lastPlans; },
         // draw one of a layer's visuals without waiting for its interval
         preview: function (layerId, xPercent) {

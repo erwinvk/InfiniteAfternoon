@@ -272,8 +272,22 @@ a {
     &.loading {
         background-image: linear-gradient(to top, $lightAltColor20 calc(var(--loaded, 0) * 100% - 7%), transparent calc(var(--loaded, 0) * 100% + 7%));
 
-        #start:before,
+        // dim whichever icon is showing. dimming both outranked #start.pause —
+        // two classes and an id beat one class and an id — so the triangle and
+        // the bars were drawn on top of each other for the whole first load.
+        #start:before {
+            opacity: .25;
+        }
+
         #start:after {
+            opacity: 0;
+        }
+
+        #start.pause:before {
+            opacity: 0;
+        }
+
+        #start.pause:after {
             opacity: .25;
         }
     }
