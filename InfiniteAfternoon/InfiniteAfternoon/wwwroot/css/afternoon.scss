@@ -111,10 +111,6 @@ a {
     }
 }
 
-input {
-    z-index: 100;
-}
-
 #titlecontainer {
     position: fixed;
     height: 100%;
@@ -262,7 +258,6 @@ input {
         background-color: #BEDFEF;
         z-index: -1;
         animation: circleFx 50s ease-in-out infinite;
-        filter: fliph;
         opacity: .3;
     }
 
@@ -512,12 +507,19 @@ button {
     }
 }
 
+// .themiddle (this panel's positioning parent) is exactly viewport-centered and
+// 200x200, so offsets from 100px land on the viewport centre. the panel used to
+// hang 318px under the circle at a fixed 550x~1050: on a 1280x720 laptop that
+// put 908px of it below the fold, with no scroll of its own and the whole page
+// scrolling instead. it is centred and scrolls itself now, at every size.
 .info {
     display: block;
     position: absolute;
-    top: 318px;
-    left: -165px;
-    width: 550px;
+    top: calc(100px - 40vh);
+    left: calc(100px - min(45vw, 275px));
+    width: min(90vw, 550px);
+    max-height: 80vh;
+    overflow-y: auto;
     padding: 30px;
     margin: 0 auto;
     background: rgba(174, 207, 223, .45);
@@ -536,17 +538,6 @@ button {
     &::-webkit-scrollbar-thumb {
         background: rgba(25, 25, 25, .35);
         border-radius: 3px;
-    }
-
-    // .themiddle (this panel's positioning parent) is exactly viewport-centered
-    // and 200x200, so offsets from 100px land on the viewport centre
-    @media (max-width: 600px) {
-        top: calc(100px - 40vh);
-        left: calc(100px - 45vw);
-        width: 90vw;
-        max-height: 80vh;
-        overflow-y: auto;
-        box-sizing: border-box;
     }
 
     &.hidden {
@@ -586,6 +577,28 @@ button {
     .phonehint {
         margin-bottom: 1.4rem;
         font-style: italic;
+    }
+}
+
+// sticky, so it stays reachable however far down the panel you have scrolled
+.closeinfo {
+    position: sticky;
+    top: -8px;
+    float: right;
+    width: 44px;
+    height: 44px;
+    margin: -14px -14px 0 0;
+    padding: 0;
+    border: 0;
+    background: none;
+    color: rgba(25, 25, 25, .55);
+    font-size: 1.9rem;
+    line-height: 1;
+    cursor: pointer;
+    transition: color .2s ease-in-out;
+
+    &:hover {
+        color: #191919;
     }
 }
 

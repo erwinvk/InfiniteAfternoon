@@ -61,9 +61,13 @@
 
     // ---- audio graph ----
     let isPlaying = false;
+    // samples can still be loading when you pause, so every start gets a token.
+    // a load that finishes after its own start was abandoned would otherwise
+    // schedule a second set of timers and play the whole piece twice.
+    let runToken = 0;
+    let starting = false;            // a second click before score.json lands
     let audioContext, analyser, gainNode, volumeNode, sleepNode, delayNode, delayFeedbackNode;
     let startTime;
-    const looping = [];              // sources that must be stopped by hand
     const pendingTimeouts = new Set();
     const bufferCache = new Map();
 
@@ -151,10 +155,9 @@
         }
     }
 
-    function playBuffer(buffer, pan, loop) {
+    function playBuffer(buffer, pan) {
         const source = audioContext.createBufferSource();
         source.buffer = buffer;
-        source.loop = !!loop;
 
         if (pan) {
             const panNode = audioContext.createStereoPanner();
@@ -167,7 +170,6 @@
         }
 
         source.start(0);
-        if (loop) looping.push(source);
         return source;
     }
 
@@ -197,6 +199,7 @@
     function start() {
         buildGraph();
 
+        const token = ++runToken;
         intervalRng = mulberry32(seed);
         history.replaceState(null, '', '?afternoon=' + seed.toString(36));
 
@@ -223,22 +226,25 @@
         beginLoading(score.layers.reduce((n, l) => n + l.samples.length, 0));
 
         score.layers.forEach(function (layer, layerIndex) {
-            loadLayer(layer, function () { markLoaded(1); }).then(function (buffers) {
-                if (!isPlaying) return;
+            loadLayer(layer, function () { if (token === runToken) markLoaded(1); }).then(function (buffers) {
+                if (!isPlaying || token !== runToken) return;
 
                 if (layer.mode === 'retrigger') {
                     let offset = layer.every;
 
                     layer.samples.forEach(function (sample, i) {
                         repeat(function () {
-                            playBuffer(buffers[i], 0, false);
+                            playBuffer(buffers[i], 0);
                             showVisual(layer, sample);
                         }, offset, layer.warpFirst);
                         offset += layer.stagger;
                     });
 
-                    // fade the piece in
-                    gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime);
+                    // fade the piece in. cancel first: pausing and starting again
+                    // within two seconds would otherwise leave the previous
+                    // fade-out on the timeline and cut this ramp short.
+                    gainNode.gain.cancelScheduledValues(audioContext.currentTime);
+                    gainNode.gain.setValueAtTime(0.01, audioContext.currentTime);
                     gainNode.gain.exponentialRampToValueAtTime(1, audioContext.currentTime + 2);
                     return;
                 }
@@ -249,7 +255,7 @@
                     const rng = mulberry32(seed + layer.rngOffset);
                     repeat(function () {
                         const i = Math.floor(rng() * buffers.length);
-                        playBuffer(buffers[i], 0, false);
+                        playBuffer(buffers[i], 0);
                         showVisual(layer, layer.samples[i]);
                     }, plan.intervals[0], plan.warp);
                     return;
@@ -259,7 +265,7 @@
                     const rng = mulberry32(seed + layer.rngOffset + i);
                     repeat(function () {
                         const pan = layer.pan ? randomPan(rng) : 0;
-                        playBuffer(buffers[i], pan, false);
+                        playBuffer(buffers[i], pan);
                         showVisual(layer, sample, (pan + 1) * 50);
                     }, plan.intervals[i], plan.warp);
                 });
@@ -268,6 +274,8 @@
 
         isPlaying = true;
         startTime = new Date();
+        // a timer chosen before pressing play counts from here, not from the click
+        if (sleepChoices[sleepChoiceIndex] > 0) armSleepTimer();
         updateMediaSession(true);
         startEnergyAnimation();
         showPlayAlongHint();
@@ -300,16 +308,15 @@
 
     function stop() {
         isPlaying = false;
+        // anything still loading belongs to a run that is over now
+        runToken++;
 
-        gainNode.gain.exponentialRampToValueAtTime(1, audioContext.currentTime);
+        gainNode.gain.cancelScheduledValues(audioContext.currentTime);
+        gainNode.gain.setValueAtTime(Math.max(0.01, gainNode.gain.value), audioContext.currentTime);
         gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 2);
 
         pendingTimeouts.forEach(clearTimeout);
         pendingTimeouts.clear();
-
-        setTimeout(function () {
-            while (looping.length) looping.pop().stop();
-        }, 2000);
 
         clearSleepTimer(true);
         stopEnergyAnimation();
@@ -435,12 +442,19 @@
             return;
         }
 
+        // the first click can land while score.json is still on its way, and
+        // isPlaying is only true once it arrives. without this a plain
+        // double-click starts the piece twice, note for note, for good.
+        if (starting) return;
+        starting = true;
+
         // build the context synchronously, inside the user gesture, or the
         // browser hands us a suspended one
         buildGraph();
         if (audioContext.state === 'suspended') audioContext.resume();
 
         scoreReady.then(function () {
+            starting = false;
             if (!score) return;
             startButton.classList.add('pause');
             startButton.setAttribute('aria-label', 'Pause');
@@ -481,6 +495,13 @@
         }
 
         sleepLabel(minutes + 'm', true, 'Sleep timer, ' + minutes + ' minutes');
+
+        // choosing a timer before pressing play only lights the button. the
+        // countdown — and the sinking circle — belong to the music, so start()
+        // arms this for real. otherwise the piece would end minutes after it
+        // began, and the circle would set over an empty room.
+        if (!isPlaying) return;
+
         startSunset(minutes);
 
         // fade out during the last sleepFadeSeconds, then pause
@@ -561,13 +582,19 @@
         if (Math.abs(pan) < 0.02) pan = 0.02; // keep the panned (and delayed) signal path
 
         loadLayer(layer).then(function (buffers) {
-            playBuffer(buffers[band.i], pan, false);
+            playBuffer(buffers[band.i], pan);
             showVisual(layer, band.s, xFraction * 100, (yFraction * 100) + '%');
         });
     });
 
     // computer keyboard
     document.addEventListener('keydown', function (e) {
+        // escape closes the panel whether or not anything is playing
+        if (e.key === 'Escape' && info && !info.classList.contains('hidden')) {
+            setInfo(false);
+            return;
+        }
+
         if (!isPlaying || e.repeat || e.metaKey || e.ctrlKey || e.altKey) return;
         if (e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA')) return;
 
@@ -580,7 +607,7 @@
             loadLayer(layer).then(function (buffers) {
                 let pan = (Math.random() * 1.6) - 0.8;
                 if (Math.abs(pan) < 0.02) pan = 0.02;
-                playBuffer(buffers[index], pan, false);
+                playBuffer(buffers[index], pan);
                 showVisual(layer, layer.samples[index], (pan + 1) * 50);
             });
             return;
@@ -800,20 +827,28 @@
     const infoButton = $('.openinfo');
     const infoContainer = $('.infocontainer');
     const info = $('.info');
+    let infoHideTimeout;
 
-    on(infoButton, 'click', function () {
-        const opening = info.classList.contains('hidden');
+    // on a phone the panel covers the button that opened it, so it needs a way
+    // out of its own: a cross, and escape
+    function setInfo(open) {
+        if (!info) return;
 
-        if (opening) {
+        clearTimeout(infoHideTimeout);
+
+        if (open) {
             infoContainer.hidden = false;
             info.classList.remove('hidden');
         } else {
             info.classList.add('hidden');
-            setTimeout(function () { infoContainer.hidden = true; }, 1000);
+            infoHideTimeout = setTimeout(function () { infoContainer.hidden = true; }, 1000);
         }
 
-        infoButton.setAttribute('aria-expanded', String(opening));
-    });
+        if (infoButton) infoButton.setAttribute('aria-expanded', String(open));
+    }
+
+    on(infoButton, 'click', function () { setInfo(info.classList.contains('hidden')); });
+    on($('.closeinfo'), 'click', function () { setInfo(false); });
 
     // ---- sharing ----
     const shareButton = $('.share');
@@ -914,12 +949,17 @@
     paintSky();
     setInterval(function () { paintSky(); }, 60000);
 
+    // one chain, however often you press play — start() used to leave the
+    // previous one running and they piled up over a long evening
+    let elapsedTimeout;
+
     function tickElapsed() {
         const timetext = elapsedString();
         const timeEl = $('.time');
         if (timeEl) timeEl.textContent = timetext.length > 0 ? 'listened for ' + timetext : '';
 
-        setTimeout(tickElapsed, 5000);
+        clearTimeout(elapsedTimeout);
+        elapsedTimeout = setTimeout(tickElapsed, 5000);
     }
 
     // ---- os media controls ----
